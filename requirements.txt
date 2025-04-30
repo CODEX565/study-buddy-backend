@@ -1,4 +1,4 @@
-Flask==2.2.3
+flask==2.2.3
 google-genai==1.12.1
 
 firebase-admin==6.1.0
@@ -7,3 +7,5 @@ pytz==2023.3
 python-dotenv==0.21.1
 Pillow==9.5.0
 gunicorn==22.0.0
+
+werkzeug==2.3.8
