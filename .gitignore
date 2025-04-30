@@ -1,0 +1,15 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# StudyBuddy user data
+studybuddy.json
+
+# VS Code settings (optional)
+.vscode/
+
+# macOS files
+.DS_Store
