@@ -12,6 +12,7 @@ from io import BytesIO
 from PIL import Image
 import pytz
 from datetime import datetime
+import time
 
 # Load environment variables
 load_dotenv()
@@ -66,29 +67,36 @@ def process_user_input(user_input, user_data):
                 print(f"✅ Updated {key.replace('_', ' ')} to '{value}'.")
     return updated
 
-def generate_image(prompt):
-    try:
-        response = requests.post(
-            "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-            headers={
-                "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "inputs": prompt,
-                "options": {"use_cache": False}
-            }
-        )
-        if response.status_code == 200:
-            img = Image.open(BytesIO(response.content))
-            buffered = BytesIO()
-            img.save(buffered, format="PNG")
-            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-            return img_base64
-        else:
-            print("[Image Generation Error]", response.text)
-    except Exception as e:
-        print("[Image Error]", e)
+def generate_image(prompt, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1",
+                headers={"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"},
+                json={"inputs": prompt},
+                timeout=60
+            )
+            
+            if response.status_code == 503:  # Model loading
+                wait_time = 10 * (attempt + 1)
+                print(f"Model loading, retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+                
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content))
+                buffered = BytesIO()
+                img.save(buffered, format="PNG")
+                return base64.b64encode(buffered.getvalue()).decode('utf-8')
+                
+            print(f"Attempt {attempt + 1} failed: {response.status_code} - {response.text}")
+            
+        except Exception as e:
+            print(f"Attempt {attempt + 1} error: {str(e)}")
+            if attempt == max_retries - 1:
+                return None
+            time.sleep(5)
+    
     return None
 
 def get_weather(city_name):
