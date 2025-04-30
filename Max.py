@@ -71,7 +71,7 @@ def generate_image(prompt, max_retries=3):
     for attempt in range(max_retries):
         try:
             response = requests.post(
-                 "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-",
+                 "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
                 headers={"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"},
                 json={"inputs": prompt},
                 timeout=60
