@@ -179,7 +179,7 @@ Instructions:
 
     try:
         response = client.models.generate_content(
-            model="gemma-3-27b-it",
+            model="gemini-1.5-flash-8b-001",
             contents=prompt,
             config=types.GenerateContentConfig(response_modalities=['TEXT'])
         )
