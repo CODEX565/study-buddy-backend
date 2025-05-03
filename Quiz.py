@@ -41,7 +41,7 @@ def generate_quiz_question(user_id, topic=None, retry_count=0):
 
     try:
         response = client.models.generate_content(
-            model="gemma-3-27b-it",
+            model="gemini-1.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_modalities=['TEXT'],
