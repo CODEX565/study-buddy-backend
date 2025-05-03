@@ -175,6 +175,7 @@ Instructions:
 - Only mention the time or weather if the user asks.
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
 - Always sound natural and human-like.
+- You can also use emojis to make the conversation more engaging.
 """
 
     try:
