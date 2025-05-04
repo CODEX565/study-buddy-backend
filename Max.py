@@ -135,7 +135,7 @@ def get_local_time(latitude, longitude):
         print("[Timezone Error]", e)
         return None, None
 
-def process_image_with_gemini(user_input, image_data, mime_type="image/png", latitude=None, longitude=None):
+def process_image_with_gemini(user_input, image_data, conversation_history, mime_type="image/png", latitude=None, longitude=None):
     try:
         weather_info = get_weather(latitude, longitude) if latitude and longitude else None
         weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
@@ -143,15 +143,26 @@ def process_image_with_gemini(user_input, image_data, mime_type="image/png", lat
         current_time = current_time or "Not available"
         current_date = current_date or "Not available"
 
+        if not isinstance(conversation_history, list):
+            conversation_history = []
+        history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
+
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
+Recent conversation:
+{history_text}
+
 User says: "{user_input}"
 Current weather: {weather_text}
 Current time: {current_time}
 Current date: {current_date}
 Analyze the provided image and incorporate the user's text in your response.
+Use the conversation history to maintain context and continuity.
 Respond in a witty, helpful, human-like way, using the weather and time context if relevant.
 Keep the response short, warm, and natural. Use emojis to make it engaging.
+Dont use other data likes current weather, time, or date except if relevant to the Image and if the user asked you.
+And make sure to keep the conversation flowing and maintain context, and always check the convo history to keep everthing clean and flow up with the user.and flow up with the user and what they send.
+Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
 """
         contents = [
             {
@@ -204,6 +215,9 @@ Summarize what the document is about and incorporate the user's text in your res
 Use the weather and time context if relevant (e.g., suggest studying indoors if it's rainy).
 Suggest what the user might want to do with it (e.g., study, quiz, summarize).
 Keep the response short, warm, and natural. Use emojis to make it engaging.
+Dont use other data likes current weather, time, or date except if relevant to the document and if the user asked you.
+And flow up with the user and what they send.
+Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
 """
         history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
 
@@ -253,7 +267,7 @@ def generate_gemini_response(user_data, user_input, conversation_history, image_
             return command
 
     if image_data:
-        return process_image_with_gemini(user_input, image_data, mime_type, latitude, longitude)
+        return process_image_with_gemini(user_input, image_data, conversation_history, mime_type, latitude, longitude)
 
     if not isinstance(conversation_history, list):
         conversation_history = []
@@ -292,6 +306,11 @@ Instructions:
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
 - Always sound natural and human-like.
 - You can also use emojis to make the conversation more engaging.
+- Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+- Make sure to keep the conversation flowing and maintain context, and always check the convo history to keep everthing clean and flow up with the user.Make sure to do that.
+Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
+- stop using hey then the usr ever time keep track of the user and the conversation {history_text}.
+
 """
 
     try:
