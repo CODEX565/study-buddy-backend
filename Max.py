@@ -15,6 +15,7 @@ import time
 from PyPDF2 import PdfReader
 from docx import Document
 import chardet
+from geopy.geocoders import Nominatim
 
 # Load environment variables
 load_dotenv()
@@ -33,7 +34,8 @@ db = firestore.client()
 # Google Gemini Client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# --------- AI FUNCTIONS --------- #
+# Geocoder for reverse geocoding
+geolocator = Nominatim(user_agent="study_buddy_app")
 
 def get_user_data(user_id):
     try:
@@ -91,19 +93,19 @@ def generate_image(prompt, max_retries=3):
                 img.save(buffered, format="PNG")
                 return base64.b64encode(buffered.getvalue()).decode('utf-8')
                 
-            print(f"Attempt {attempt + 1} failed: {response.status_code} - {response.text}")
+            print(f"Attempt {attempt + 1} failed: ${response.status_code} - ${response.text}")
             
         except Exception as e:
-            print(f"Attempt {attempt + 1} error: {str(e)}")
+            print(f"Attempt {attempt + 1} error: ${str(e)}")
             if attempt == max_retries - 1:
                 return None
             time.sleep(5)
     
     return None
 
-def get_weather(city_name):
+def get_weather(latitude, longitude):
     try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={OPENWEATHER_API_KEY}&units=metric"
+        url = f"http://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={OPENWEATHER_API_KEY}&units=metric"
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
@@ -120,13 +122,35 @@ def get_weather(city_name):
         print("[Weather Fetch Error]", e)
     return None
 
-def process_image_with_gemini(user_input, image_data, mime_type="image/png"):
+def get_local_time(latitude, longitude):
     try:
-        # Prepare prompt with image
+        location = geolocator.reverse((latitude, longitude), language='en')
+        if location:
+            timezone_str = location.raw.get('timezone', 'UTC')
+            tz = pytz.timezone(timezone_str)
+            now = datetime.now(tz)
+            return now.strftime("%I:%M %p"), now.strftime("%A, %d %B %Y")
+        return None, None
+    except Exception as e:
+        print("[Timezone Error]", e)
+        return None, None
+
+def process_image_with_gemini(user_input, image_data, mime_type="image/png", latitude=None, longitude=None):
+    try:
+        weather_info = get_weather(latitude, longitude) if latitude and longitude else None
+        weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
+        current_time, current_date = get_local_time(latitude, longitude) if latitude and longitude else (None, None)
+        current_time = current_time or "Not available"
+        current_date = current_date or "Not available"
+
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
 User says: "{user_input}"
-Analyze the provided image and respond in a witty, helpful, human-like way.
+Current weather: {weather_text}
+Current time: {current_time}
+Current date: {current_date}
+Analyze the provided image and incorporate the user's text in your response.
+Respond in a witty, helpful, human-like way, using the weather and time context if relevant.
 Keep the response short, warm, and natural. Use emojis to make it engaging.
 """
         contents = [
@@ -138,14 +162,12 @@ Keep the response short, warm, and natural. Use emojis to make it engaging.
             }
         ]
         
-        # Call Gemini API
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=contents,
             config=types.GenerateContentConfig(response_modalities=['TEXT'])
         )
         
-        # Extract response
         text = ""
         for part in response.candidates[0].content.parts:
             if hasattr(part, "text") and part.text:
@@ -155,22 +177,31 @@ Keep the response short, warm, and natural. Use emojis to make it engaging.
         print(f"[Gemini Image Error] {e}")
         return "❌ Oops! Something went wrong with the image."
 
-def process_document_with_gemini(user_id, document_text, conversation_history):
+def process_document_with_gemini(user_id, document_text, user_input, conversation_history, latitude=None, longitude=None):
     try:
-        # Get user data
         user_data = get_user_data(user_id)
         if not user_data:
             return None
 
-        # Prepare prompt with document text
+        weather_info = get_weather(latitude, longitude) if latitude and longitude else None
+        weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
+        current_time, current_date = get_local_time(latitude, longitude) if latitude and longitude else (None, None)
+        current_time = current_time or "Not available"
+        current_date = current_date or "Not available"
+
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
+The user says: "{user_input}"
+Current weather: {weather_text}
+Current time: {current_time}
+Current date: {current_date}
 The user has uploaded a document with the following content:
 ```
-{document_text[:2000]}  # Limit to 2000 chars to avoid token limits
+{document_text[:2000]}
 ```
 
-Summarize what the document is about in a witty, helpful, human-like way.
+Summarize what the document is about and incorporate the user's text in your response.
+Use the weather and time context if relevant (e.g., suggest studying indoors if it's rainy).
 Suggest what the user might want to do with it (e.g., study, quiz, summarize).
 Keep the response short, warm, and natural. Use emojis to make it engaging.
 """
@@ -183,14 +214,12 @@ Recent conversation:
 {prompt}
 """
 
-        # Call Gemini API
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=full_prompt,
             config=types.GenerateContentConfig(response_modalities=['TEXT'])
         )
 
-        # Extract response
         text = ""
         for part in response.candidates[0].content.parts:
             if hasattr(part, "text") and part.text:
@@ -200,14 +229,12 @@ Recent conversation:
         print(f"[Gemini Document Error] {e}")
         return "❌ Oops! Something went wrong with the document."
 
-def generate_gemini_response(user_data, user_input, conversation_history, image_data=None, mime_type=None):
-    uk_tz = pytz.timezone('Europe/London')
-    now = datetime.now(uk_tz)
-    current_time = now.strftime("%I:%M %p")
-    current_date = now.strftime("%A, %d %B %Y")  # Example: "Saturday, 04 May 2025"
-
-    weather_info = get_weather("London")
+def generate_gemini_response(user_data, user_input, conversation_history, image_data=None, mime_type=None, latitude=None, longitude=None):
+    weather_info = get_weather(latitude, longitude) if latitude and longitude else None
     weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
+    current_time, current_date = get_local_time(latitude, longitude) if latitude and longitude else (None, None)
+    current_time = current_time or "Not available"
+    current_date = current_date or "Not available"
 
     navigation_keywords = {
         "home screen": "go_to_home_screen",
@@ -225,9 +252,8 @@ def generate_gemini_response(user_data, user_input, conversation_history, image_
         if re.search(rf"(go|take|navigate|open|show).*{keyword}", user_input, re.IGNORECASE):
             return command
 
-    # Handle image processing if image_data is provided
-    if image_data and re.search(r"(analyze|describe|explain|what is in|summarize).*image", user_input, re.IGNORECASE):
-        return process_image_with_gemini(user_input, image_data, mime_type)
+    if image_data:
+        return process_image_with_gemini(user_input, image_data, mime_type, latitude, longitude)
 
     if not isinstance(conversation_history, list):
         conversation_history = []
@@ -247,9 +273,9 @@ Here’s what you know about the user:
 - Study Plan: {user_data.get('study_plan', 'not specified')}
 - Weekly Challenges Enabled: {user_data.get('weekly_challenges_enabled', False)}
 - Focus Music Enabled: {user_data.get('focus_music_enabled', False)}
+- Current Weather: {weather_text}
 - Current Time: {current_time}
 - Current Date: {current_date}
-- Current Weather: {weather_text}
 
 Recent conversation:
 {history_text}
@@ -260,8 +286,9 @@ Instructions:
 - If the user asks for an image to be created (example: "draw", "create a picture", "make an image"),
   reply with [GENERATE_IMAGE: description of the image].
 - Otherwise, respond like a helpful, witty, supportive friend.
+- Use the weather and time context if relevant (e.g., suggest studying indoors if it's rainy).
 - Keep responses short, warm, and natural.
-- Only mention the time, date, or weather if the user asks.
+- Only mention the weather or time if it enhances the response or the user asks.
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
 - Always sound natural and human-like.
 - You can also use emojis to make the conversation more engaging.

@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, session
-import Max  # Your Max.py logic
-import Quiz  # Your Quiz.py logic
+import Max
+import Quiz
 import re
 import os
 from dotenv import load_dotenv
@@ -21,8 +21,6 @@ ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --------- EXISTING ROUTES --------- #
-
 @app.route("/get_user_data/<user_id>", methods=["GET"])
 def get_user_info(user_id):
     user_data = Max.get_user_data(user_id)
@@ -35,7 +33,8 @@ def chat():
     data = request.get_json()
     user_input = data.get("user_input")
     user_id = data.get("user_id")
-    image_base64 = data.get("image_base64")  # Optional image data
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
 
     if not user_input or not user_id:
         return jsonify({"error": "Missing user_input or user_id"}), 400
@@ -50,11 +49,11 @@ def chat():
 
     user_data = Max.process_user_input(user_input, user_data)
     response_text = Max.generate_gemini_response(
-        user_data, 
-        user_input, 
-        conversation_history, 
-        image_data=image_base64, 
-        mime_type="image/png" if image_base64 else None
+        user_data,
+        user_input,
+        conversation_history,
+        latitude=latitude,
+        longitude=longitude
     )
 
     image_response_base64 = None
@@ -78,16 +77,15 @@ def chat():
 
 @app.route("/weather", methods=["GET"])
 def weather():
-    city = request.args.get("city")
-    if not city:
-        return jsonify({"error": "City parameter is required"}), 400
+    latitude = request.args.get("latitude")
+    longitude = request.args.get("longitude")
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude and longitude parameters are required"}), 400
 
-    weather_data = Max.get_weather(city)
+    weather_data = Max.get_weather(latitude, longitude)
     if weather_data:
         return jsonify(weather_data)
     return jsonify({"error": "Unable to fetch weather"}), 500
-
-# --------- DOCUMENT PROCESSING ROUTE --------- #
 
 @app.route("/process_document", methods=["POST"])
 def process_document():
@@ -101,18 +99,18 @@ def process_document():
     if not allowed_file(file.filename):
         return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
 
-    # Get user_id from form data
     user_id = request.form.get('user_id')
+    user_input = request.form.get('user_input', '')
+    latitude = request.form.get('latitude')
+    longitude = request.form.get('longitude')
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
 
-    # Save file temporarily
     try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(tempfile.gettempdir(), filename)
         file.save(temp_path)
 
-        # Process based on file extension
         extension = filename.rsplit('.', 1)[1].lower()
         if extension == 'pdf':
             text = Max.process_pdf(temp_path)
@@ -123,11 +121,9 @@ def process_document():
         else:
             text = None
 
-        # Clean up temporary file
         os.remove(temp_path)
 
         if text:
-            # Get user data and conversation history
             user_data = Max.get_user_data(user_id)
             if not user_data:
                 return jsonify({"error": "User not found"}), 404
@@ -136,11 +132,16 @@ def process_document():
             if not isinstance(conversation_history, list):
                 conversation_history = []
 
-            # Generate conversational response using Gemini
-            response_text = Max.process_document_with_gemini(user_id, text, conversation_history)
+            response_text = Max.process_document_with_gemini(
+                user_id,
+                text,
+                user_input,
+                conversation_history,
+                latitude=latitude,
+                longitude=longitude
+            )
             if response_text:
-                # Update conversation history
-                conversation_history.append({"user": f"Uploaded file: {filename}", "max": response_text})
+                conversation_history.append({"user": f"{user_input or 'Uploaded file: ' + filename}", "max": response_text})
                 Max.save_conversation_history(user_id, conversation_history)
                 return jsonify({"response": response_text})
             return jsonify({"error": "Failed to process document content"}), 500
@@ -152,14 +153,14 @@ def process_document():
         print(f"[Document Processing Error] {e}")
         return jsonify({"error": "Error processing document"}), 500
 
-# --------- IMAGE PROCESSING ROUTE --------- #
-
 @app.route("/process_image", methods=["POST"])
 def process_image():
     data = request.get_json()
     user_input = data.get("user_input")
     user_id = data.get("user_id")
     image_base64 = data.get("image_base64")
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
 
     if not user_input or not user_id or not image_base64:
         return jsonify({"error": "Missing user_input, user_id, or image_base64"}), 400
@@ -172,21 +173,20 @@ def process_image():
     if not isinstance(conversation_history, list):
         conversation_history = []
 
-    # Process image with Gemini
     response_text = Max.generate_gemini_response(
         user_data,
         user_input,
         conversation_history,
         image_data=image_base64,
-        mime_type="image/png"
+        mime_type="image/png",
+        latitude=latitude,
+        longitude=longitude
     )
 
     conversation_history.append({"user": user_input, "max": response_text})
     Max.save_conversation_history(user_id, conversation_history)
 
     return jsonify({"response": response_text})
-
-# --------- QUIZ ROUTES --------- #
 
 @app.route("/generate_quiz", methods=["GET"])
 def generate_quiz():
@@ -211,8 +211,6 @@ def submit_quiz_answer():
     if 'error' in result:
         return jsonify(result), 404
     return jsonify({"is_correct": result.get("result") == "correct"})
-
-# --------- MAIN --------- #
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
