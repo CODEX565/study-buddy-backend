@@ -1,4 +1,3 @@
-# Max.py
 import os
 import re
 import requests
@@ -13,6 +12,9 @@ from PIL import Image
 import pytz
 from datetime import datetime
 import time
+from PyPDF2 import PdfReader
+from docx import Document
+import chardet
 
 # Load environment variables
 load_dotenv()
@@ -71,7 +73,7 @@ def generate_image(prompt, max_retries=3):
     for attempt in range(max_retries):
         try:
             response = requests.post(
-                 "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
                 headers={"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"},
                 json={"inputs": prompt},
                 timeout=60
@@ -118,7 +120,87 @@ def get_weather(city_name):
         print("[Weather Fetch Error]", e)
     return None
 
-def generate_gemini_response(user_data, user_input, conversation_history):
+def process_image_with_gemini(user_input, image_data, mime_type="image/png"):
+    try:
+        # Prepare prompt with image
+        prompt = f"""
+You are Max, the friendly AI inside the Study Buddy app.
+User says: "{user_input}"
+Analyze the provided image and respond in a witty, helpful, human-like way.
+Keep the response short, warm, and natural. Use emojis to make it engaging.
+"""
+        contents = [
+            {
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"data": image_data, "mime_type": mime_type}}
+                ]
+            }
+        ]
+        
+        # Call Gemini API
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(response_modalities=['TEXT'])
+        )
+        
+        # Extract response
+        text = ""
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text = part.text
+        return text or "Hmm, I couldn't process that image!"
+    except Exception as e:
+        print(f"[Gemini Image Error] {e}")
+        return "❌ Oops! Something went wrong with the image."
+
+def process_document_with_gemini(user_id, document_text, conversation_history):
+    try:
+        # Get user data
+        user_data = get_user_data(user_id)
+        if not user_data:
+            return None
+
+        # Prepare prompt with document text
+        prompt = f"""
+You are Max, the friendly AI inside the Study Buddy app.
+The user has uploaded a document with the following content:
+```
+{document_text[:2000]}  # Limit to 2000 chars to avoid token limits
+```
+
+Summarize what the document is about in a witty, helpful, human-like way.
+Suggest what the user might want to do with it (e.g., study, quiz, summarize).
+Keep the response short, warm, and natural. Use emojis to make it engaging.
+"""
+        history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
+
+        full_prompt = f"""
+Recent conversation:
+{history_text}
+
+{prompt}
+"""
+
+        # Call Gemini API
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=full_prompt,
+            config=types.GenerateContentConfig(response_modalities=['TEXT'])
+        )
+
+        # Extract response
+        text = ""
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text = part.text
+        return text or "Hmm, I couldn't process that document!"
+    except Exception as e:
+        print(f"[Gemini Document Error] {e}")
+        return "❌ Oops! Something went wrong with the document."
+
+def generate_gemini_response(user_data, user_input, conversation_history, image_data=None, mime_type=None):
     uk_tz = pytz.timezone('Europe/London')
     now = datetime.now(uk_tz)
     current_time = now.strftime("%I:%M %p")
@@ -142,6 +224,10 @@ def generate_gemini_response(user_data, user_input, conversation_history):
     for keyword, command in navigation_keywords.items():
         if re.search(rf"(go|take|navigate|open|show).*{keyword}", user_input, re.IGNORECASE):
             return command
+
+    # Handle image processing if image_data is provided
+    if image_data and re.search(r"(analyze|describe|explain|what is in|summarize).*image", user_input, re.IGNORECASE):
+        return process_image_with_gemini(user_input, image_data, mime_type)
 
     if not isinstance(conversation_history, list):
         conversation_history = []
@@ -195,3 +281,39 @@ Instructions:
     except Exception as e:
         print(f"[Gemini Error] {e}")
         return "❌ Oops! Something went wrong."
+
+# --------- DOCUMENT PROCESSING FUNCTIONS --------- #
+
+def process_pdf(file_path):
+    try:
+        reader = PdfReader(file_path)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except Exception as e:
+        print(f"[PDF Processing Error] {e}")
+        return None
+
+def process_docx(file_path):
+    try:
+        doc = Document(file_path)
+        text = ""
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+        return text
+    except Exception as e:
+        print(f"[DOCX Processing Error] {e}")
+        return None
+
+def process_text_file(file_path):
+    try:
+        with open(file_path, 'rb') as file:
+            raw_data = file.read()
+            result = chardet.detect(raw_data)
+            encoding = result['encoding']
+            text = raw_data.decode(encoding)
+            return text
+    except Exception as e:
+        print(f"[Text File Processing Error] {e}")
+        return None
