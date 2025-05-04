@@ -77,7 +77,7 @@ def generate_image(prompt, max_retries=3):
                 timeout=60
             )
             
-            if response.status_code == 503:  # Model loading
+            if response.status_code == 503:
                 wait_time = 10 * (attempt + 1)
                 print(f"Model loading, retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
@@ -120,7 +120,9 @@ def get_weather(city_name):
 
 def generate_gemini_response(user_data, user_input, conversation_history):
     uk_tz = pytz.timezone('Europe/London')
-    current_time = datetime.now(uk_tz).strftime("%I:%M %p")
+    now = datetime.now(uk_tz)
+    current_time = now.strftime("%I:%M %p")
+    current_date = now.strftime("%A, %d %B %Y")  # Example: "Saturday, 04 May 2025"
 
     weather_info = get_weather("London")
     weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
@@ -160,6 +162,7 @@ Here’s what you know about the user:
 - Weekly Challenges Enabled: {user_data.get('weekly_challenges_enabled', False)}
 - Focus Music Enabled: {user_data.get('focus_music_enabled', False)}
 - Current Time: {current_time}
+- Current Date: {current_date}
 - Current Weather: {weather_text}
 
 Recent conversation:
@@ -172,7 +175,7 @@ Instructions:
   reply with [GENERATE_IMAGE: description of the image].
 - Otherwise, respond like a helpful, witty, supportive friend.
 - Keep responses short, warm, and natural.
-- Only mention the time or weather if the user asks.
+- Only mention the time, date, or weather if the user asks.
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
 - Always sound natural and human-like.
 - You can also use emojis to make the conversation more engaging.
@@ -192,4 +195,3 @@ Instructions:
     except Exception as e:
         print(f"[Gemini Error] {e}")
         return "❌ Oops! Something went wrong."
-
