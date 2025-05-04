@@ -156,13 +156,13 @@ User says: "{user_input}"
 Current weather: {weather_text}
 Current time: {current_time}
 Current date: {current_date}
+
 Analyze the provided image and incorporate the user's text in your response.
-Use the conversation history to maintain context and continuity.
-Respond in a witty, helpful, human-like way, using the weather and time context if relevant.
+Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
+If the user switches topics, transition smoothly and keep the response realistic and human-like.
+Respond in a witty, helpful, human-like way, using the weather and time context only if relevant to the image or user request.
 Keep the response short, warm, and natural. Use emojis to make it engaging.
-Dont use other data likes current weather, time, or date except if relevant to the Image and if the user asked you.
-And make sure to keep the conversation flowing and maintain context, and always check the convo history to keep everthing clean and flow up with the user.and flow up with the user and what they send.
-Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
 """
         contents = [
             {
@@ -202,22 +202,26 @@ def process_document_with_gemini(user_id, document_text, user_input, conversatio
 
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
-The user says: "{user_input}"
+Recent conversation:
+{history_text}
+
+User says: "{user_input}"
 Current weather: {weather_text}
 Current time: {current_time}
 Current date: {current_date}
+
 The user has uploaded a document with the following content:
 ```
 {document_text[:2000]}
 ```
 
 Summarize what the document is about and incorporate the user's text in your response.
-Use the weather and time context if relevant (e.g., suggest studying indoors if it's rainy).
+Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
+If the user switches topics, transition smoothly and keep the response realistic and human-like.
+Use the weather and time context only if relevant to the document or user request.
 Suggest what the user might want to do with it (e.g., study, quiz, summarize).
 Keep the response short, warm, and natural. Use emojis to make it engaging.
-Dont use other data likes current weather, time, or date except if relevant to the document and if the user asked you.
-And flow up with the user and what they send.
-Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
 """
         history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
 
@@ -300,19 +304,14 @@ Instructions:
 - If the user asks for an image to be created (example: "draw", "create a picture", "make an image"),
   reply with [GENERATE_IMAGE: description of the image].
 - Otherwise, respond like a helpful, witty, supportive friend.
-- Use the weather and time context if relevant (e.g., suggest studying indoors if it's rainy).
-- Keep responses short, warm, and natural.
-- Only mention the weather or time if it enhances the response or the user asks.
-- If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
-- Always sound natural and human-like.
-- You can also use emojis to make the conversation more engaging.
 - Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
-- Make sure to keep the conversation flowing and maintain context, and always check the convo history to keep everthing clean and flow up with the user.Make sure to do that.
-Make sure to keep the whole convo realistic and human-like.And if the user switches to another topic, make sure to keep the convo realistic and human-like and flow up.
-- stop using hey then the usr ever time keep track of the user and the conversation {history_text}.
-
+- Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
+- If the user switches topics, transition smoothly and keep the response realistic and human-like.
+- Use the weather and time context only if relevant to the user’s request or to enhance the response.
+- Keep responses short, warm, and natural.
+- If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
+- Always sound natural and human-like, using emojis to make the conversation engaging.
 """
-
     try:
         response = client.models.generate_content(
             model="gemini-1.5-flash",
