@@ -4,8 +4,7 @@ import uuid
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from firebase_config import db  # Import Firebase from config file
-from firebase_admin import firestore  # Add this import for Firestore
+from firebase_admin import firestore
 
 # Load environment variables
 load_dotenv()
@@ -18,9 +17,9 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 MAX_RETRIES = 5
 
-def generate_quiz_question(user_id, topic=None, retry_count=0):
-    quiz_history = get_quiz_history(user_id)
-    study_goal = get_study_goal(user_id) if not topic else None
+def generate_quiz_question(db, user_id, topic=None, retry_count=0):
+    quiz_history = get_quiz_history(db, user_id)
+    study_goal = get_study_goal(db, user_id) if not topic else None
     effective_topic = topic or study_goal or 'programming and coding'
 
     history_str = ""
@@ -70,11 +69,11 @@ def generate_quiz_question(user_id, topic=None, retry_count=0):
                     if question['question'] == question_data['question']:
                         print(f"[Duplicate Question] {question_data['question']}")
                         if retry_count < MAX_RETRIES:
-                            return generate_quiz_question(user_id, topic, retry_count + 1)
+                            return generate_quiz_question(db, user_id, topic, retry_count + 1)
                         return {"error": "Unable to generate unique quiz question"}
 
                 question_data['question_id'] = str(uuid.uuid4())
-                save_quiz_to_history(user_id, question_data)
+                save_quiz_to_history(db, user_id, question_data)
 
                 return {
                     "question": question_data['question'],
@@ -94,7 +93,7 @@ def generate_quiz_question(user_id, topic=None, retry_count=0):
         print(f"[Quiz Generation Error] {e}")
         return {"error": "Unable to generate quiz question"}
 
-def save_quiz_response(user_id, question_id, user_answer, is_correct):
+def save_quiz_response(db, user_id, question_id, user_answer, is_correct):
     try:
         user_ref = db.collection('users').document(user_id)
         user_ref.update({
@@ -107,7 +106,7 @@ def save_quiz_response(user_id, question_id, user_answer, is_correct):
     except Exception as e:
         print(f"[Firestore Error] {e}")
 
-def save_quiz_to_history(user_id, question_data):
+def save_quiz_to_history(db, user_id, question_data):
     try:
         user_ref = db.collection('users').document(user_id)
         user_ref.update({
@@ -116,7 +115,7 @@ def save_quiz_to_history(user_id, question_data):
     except Exception as e:
         print(f"[Firestore Quiz History Error] {e}")
 
-def get_quiz_history(user_id):
+def get_quiz_history(db, user_id):
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
@@ -125,7 +124,7 @@ def get_quiz_history(user_id):
         print(f"[Firestore Error] {e}")
         return []
 
-def get_study_goal(user_id):
+def get_study_goal(db, user_id):
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
@@ -134,14 +133,14 @@ def get_study_goal(user_id):
         print(f"[Firestore Error] {e}")
         return None
 
-def check_answer(user_id, question_id, user_answer):
-    quiz_history = get_quiz_history(user_id)
+def check_answer(db, user_id, question_id, user_answer):
+    quiz_history = get_quiz_history(db, user_id)
 
     for question in quiz_history:
         if question.get('question_id') == question_id:
             correct_answer = question.get('correct_answer')
             is_correct = user_answer == correct_answer
-            save_quiz_response(user_id, question_id, user_answer, is_correct)
+            save_quiz_response(db, user_id, question_id, user_answer, is_correct)
             return {"result": "correct" if is_correct else "incorrect"}
 
     return {"error": "Question not found in history"}

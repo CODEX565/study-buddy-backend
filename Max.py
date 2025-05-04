@@ -53,6 +53,16 @@ def save_conversation_history(user_id, history):
     except Exception as e:
         print(f"[Firestore Update Error] {e}")
 
+def save_user_memory(user_id, memory):
+    try:
+        user_ref = db.collection('users').document(user_id)
+        user_ref.update({
+            "memories": firestore.ArrayUnion([memory])
+        })
+        print(f"[Memory Saved] {memory}")
+    except Exception as e:
+        print(f"[Firestore Memory Error] {e}")
+
 def process_user_input(user_input, user_data):
     updated = user_data.copy()
     patterns = {
@@ -70,6 +80,20 @@ def process_user_input(user_input, user_data):
                 updated[key] = value
                 print(f"✅ Updated {key.replace('_', ' ')} to '{value}'.")
     return updated
+
+def detect_memories(user_input):
+    memory_patterns = [
+        (r"(?:i like|love|enjoy|fan of)\s+([a-zA-Z\s]+)", "likes"),
+        (r"(?:i hate|dislike|not a fan of)\s+([a-zA-Z\s]+)", "dislikes"),
+        (r"(?:my favorite)\s+(?:artist|band|singer|music)\s+is\s+([a-zA-Z\s]+)", "favorite_music"),
+    ]
+    memories = []
+    for pattern, memory_type in memory_patterns:
+        match = re.search(pattern, user_input, re.IGNORECASE)
+        if match:
+            value = match.group(1).strip()
+            memories.append({"type": memory_type, "value": value, "timestamp": datetime.now().isoformat()})
+    return memories
 
 def generate_image(prompt, max_retries=3):
     for attempt in range(max_retries):
@@ -135,7 +159,7 @@ def get_local_time(latitude, longitude):
         print("[Timezone Error]", e)
         return None, None
 
-def process_image_with_gemini(user_input, image_data, conversation_history, mime_type="image/png", latitude=None, longitude=None):
+def process_image_with_gemini(user_input, image_data, conversation_history, user_memories, user_id, mime_type="image/png", latitude=None, longitude=None):
     try:
         weather_info = get_weather(latitude, longitude) if latitude and longitude else None
         weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
@@ -147,10 +171,15 @@ def process_image_with_gemini(user_input, image_data, conversation_history, mime
             conversation_history = []
         history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
 
+        memories_text = "\n".join([f"{m['type']}: {m['value']}" for m in user_memories[-3:]]) if user_memories else "No memories available"
+
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
 Recent conversation:
 {history_text}
+
+User memories:
+{memories_text}
 
 User says: "{user_input}"
 Current weather: {weather_text}
@@ -158,9 +187,10 @@ Current time: {current_time}
 Current date: {current_date}
 
 Analyze the provided image and incorporate the user's text in your response.
-Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+Use the conversation history and user memories to maintain context and personalize responses.
 Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
 If the user switches topics, transition smoothly and keep the response realistic and human-like.
+If the user mentions preferences (e.g., liking an artist), include [SAVE_MEMORY: type=value] in your response to save it.
 Respond in a witty, helpful, human-like way, using the weather and time context only if relevant to the image or user request.
 Keep the response short, warm, and natural. Use emojis to make it engaging.
 """
@@ -183,12 +213,20 @@ Keep the response short, warm, and natural. Use emojis to make it engaging.
         for part in response.candidates[0].content.parts:
             if hasattr(part, "text") and part.text:
                 text = part.text
+        
+        # Check for memory-saving instructions
+        memory_match = re.search(r"\[SAVE_MEMORY:\s*(\w+)=(.+?)\]", text)
+        if memory_match:
+            memory_type, memory_value = memory_match.groups()
+            save_user_memory(user_id, {"type": memory_type, "value": memory_value, "timestamp": datetime.now().isoformat()})
+            text = re.sub(r"\[SAVE_MEMORY:[^\]]+\]", "", text).strip()
+
         return text or "Hmm, I couldn't process that image!"
     except Exception as e:
         print(f"[Gemini Image Error] {e}")
         return "❌ Oops! Something went wrong with the image."
 
-def process_document_with_gemini(user_id, document_text, user_input, conversation_history, latitude=None, longitude=None):
+def process_document_with_gemini(user_id, document_text, user_input, conversation_history, user_memories, latitude=None, longitude=None):
     try:
         user_data = get_user_data(user_id)
         if not user_data:
@@ -200,10 +238,16 @@ def process_document_with_gemini(user_id, document_text, user_input, conversatio
         current_time = current_time or "Not available"
         current_date = current_date or "Not available"
 
+        history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
+        memories_text = "\n".join([f"{m['type']}: {m['value']}" for m in user_memories[-3:]]) if user_memories else "No memories available"
+
         prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app.
 Recent conversation:
 {history_text}
+
+User memories:
+{memories_text}
 
 User says: "{user_input}"
 Current weather: {weather_text}
@@ -216,15 +260,14 @@ The user has uploaded a document with the following content:
 ```
 
 Summarize what the document is about and incorporate the user's text in your response.
-Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+Use the conversation history and user memories to maintain context and personalize responses.
 Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
 If the user switches topics, transition smoothly and keep the response realistic and human-like.
+If the user mentions preferences (e.g., liking an artist), include [SAVE_MEMORY: type=value] in your response to save it.
 Use the weather and time context only if relevant to the document or user request.
 Suggest what the user might want to do with it (e.g., study, quiz, summarize).
 Keep the response short, warm, and natural. Use emojis to make it engaging.
 """
-        history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
-
         full_prompt = f"""
 Recent conversation:
 {history_text}
@@ -242,12 +285,20 @@ Recent conversation:
         for part in response.candidates[0].content.parts:
             if hasattr(part, "text") and part.text:
                 text = part.text
+        
+        # Check for memory-saving instructions
+        memory_match = re.search(r"\[SAVE_MEMORY:\s*(\w+)=(.+?)\]", text)
+        if memory_match:
+            memory_type, memory_value = memory_match.groups()
+            save_user_memory(user_id, {"type": memory_type, "value": memory_value, "timestamp": datetime.now().isoformat()})
+            text = re.sub(r"\[SAVE_MEMORY:[^\]]+\]", "", text).strip()
+
         return text or "Hmm, I couldn't process that document!"
     except Exception as e:
         print(f"[Gemini Document Error] {e}")
         return "❌ Oops! Something went wrong with the document."
 
-def generate_gemini_response(user_data, user_input, conversation_history, image_data=None, mime_type=None, latitude=None, longitude=None):
+def generate_gemini_response(user_data, user_input, conversation_history, user_id, image_data=None, mime_type=None, latitude=None, longitude=None):
     weather_info = get_weather(latitude, longitude) if latitude and longitude else None
     weather_text = f"{weather_info['description']}, {weather_info['temperature']}°C" if weather_info else "Not available"
     current_time, current_date = get_local_time(latitude, longitude) if latitude and longitude else (None, None)
@@ -271,12 +322,18 @@ def generate_gemini_response(user_data, user_input, conversation_history, image_
             return command
 
     if image_data:
-        return process_image_with_gemini(user_input, image_data, conversation_history, mime_type, latitude, longitude)
+        return process_image_with_gemini(user_input, image_data, conversation_history, user_data.get('memories', []), user_id, mime_type, latitude, longitude)
 
     if not isinstance(conversation_history, list):
         conversation_history = []
 
     history_text = "\n".join([f"User: {msg['user']}\nMax: {msg['max']}" for msg in conversation_history[-5:]])
+    memories_text = "\n".join([f"{m['type']}: {m['value']}" for m in user_data.get('memories', [])[-3:]]) if user_data.get('memories') else "No memories available"
+
+    # Detect memories from user input
+    detected_memories = detect_memories(user_input)
+    for memory in detected_memories:
+        save_user_memory(user_id, memory)
 
     prompt = f"""
 You are Max, the friendly AI inside the Study Buddy app. 
@@ -294,6 +351,8 @@ Here’s what you know about the user:
 - Current Weather: {weather_text}
 - Current Time: {current_time}
 - Current Date: {current_date}
+- User Memories:
+{memories_text}
 
 Recent conversation:
 {history_text}
@@ -304,9 +363,10 @@ Instructions:
 - If the user asks for an image to be created (example: "draw", "create a picture", "make an image"),
   reply with [GENERATE_IMAGE: description of the image].
 - Otherwise, respond like a helpful, witty, supportive friend.
-- Use the conversation history to maintain context and respond as if continuing an ongoing dialogue.
+- Use the conversation history and user memories to maintain context and personalize responses.
 - Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
 - If the user switches topics, transition smoothly and keep the response realistic and human-like.
+- If the user mentions preferences (e.g., "I like Juice WRLD"), include [SAVE_MEMORY: type=value] in your response to save it (e.g., [SAVE_MEMORY: likes=Juice WRLD]).
 - Use the weather and time context only if relevant to the user’s request or to enhance the response.
 - Keep responses short, warm, and natural.
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
@@ -322,6 +382,14 @@ Instructions:
         for part in response.candidates[0].content.parts:
             if hasattr(part, "text") and part.text:
                 text = part.text
+        
+        # Check for memory-saving instructions
+        memory_match = re.search(r"\[SAVE_MEMORY:\s*(\w+)=(.+?)\]", text)
+        if memory_match:
+            memory_type, memory_value = memory_match.groups()
+            save_user_memory(user_id, {"type": memory_type, "value": memory_value, "timestamp": datetime.now().isoformat()})
+            text = re.sub(r"\[SAVE_MEMORY:[^\]]+\]", "", text).strip()
+
         return text or "Hmm, I didn't quite catch that!"
     except Exception as e:
         print(f"[Gemini Error] {e}")

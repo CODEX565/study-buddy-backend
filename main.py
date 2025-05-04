@@ -1,216 +1,209 @@
-from flask import Flask, request, jsonify, session
-import Max
-import Quiz
-import re
+from flask import Flask, request, jsonify
+import firebase_admin
+from firebase_admin import credentials, firestore
+from Max import generate_gemini_response, process_image_with_gemini, process_document_with_gemini, process_pdf, process_docx, process_text_file
+from Quiz import generate_quiz_question, check_answer
 import os
-from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-import tempfile
-
-# Load environment variables from .env file
-load_dotenv()
 
 app = Flask(__name__)
 
-# Secret key for session security (pulled from .env)
-app.secret_key = os.getenv("SECRET_KEY", "fallback-secret-key")
+# Firebase setup
+if not firebase_admin._apps:
+    cred = credentials.Certificate('studybuddy.json')
+    firebase_admin.initialize_app(cred)
 
-# Allowed file extensions for document processing
+db = firestore.client()
+
+UPLOAD_FOLDER = 'Uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route("/get_user_data/<user_id>", methods=["GET"])
-def get_user_info(user_id):
-    user_data = Max.get_user_data(user_id)
-    if user_data:
-        return jsonify(user_data)
-    return jsonify({"error": "User not found"}), 404
-
-@app.route("/chat", methods=["POST"])
+@app.route('/chat', methods=['POST'])
 def chat():
-    data = request.get_json()
-    user_input = data.get("user_input")
-    user_id = data.get("user_id")
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
-
-    if not user_input or not user_id:
-        return jsonify({"error": "Missing user_input or user_id"}), 400
-
-    user_data = Max.get_user_data(user_id)
-    if not user_data:
-        return jsonify({"error": "User not found"}), 404
-
-    conversation_history = user_data.get("conversation_history", [])
-    if not isinstance(conversation_history, list):
-        conversation_history = []
-
-    user_data = Max.process_user_input(user_input, user_data)
-    response_text = Max.generate_gemini_response(
-        user_data,
-        user_input,
-        conversation_history,
-        latitude=latitude,
-        longitude=longitude
-    )
-
-    image_response_base64 = None
-    if "[GENERATE_IMAGE:" in response_text:
-        match = re.search(r"\[GENERATE_IMAGE:(.*?)\]", response_text)
-        if match:
-            image_prompt = match.group(1).strip()
-            image_response_base64 = Max.generate_image(image_prompt)
-            if image_response_base64:
-                response_text = "Here's the image I created for you! 🎨"
-            else:
-                response_text = "❌ Failed to generate the image."
-
-    conversation_history.append({"user": user_input, "max": response_text})
-    Max.save_conversation_history(user_id, conversation_history)
-
-    return jsonify({
-        "response": response_text,
-        "image_base64": image_response_base64
-    })
-
-@app.route("/weather", methods=["GET"])
-def weather():
-    latitude = request.args.get("latitude")
-    longitude = request.args.get("longitude")
-    if not latitude or not longitude:
-        return jsonify({"error": "Latitude and longitude parameters are required"}), 400
-
-    weather_data = Max.get_weather(latitude, longitude)
-    if weather_data:
-        return jsonify(weather_data)
-    return jsonify({"error": "Unable to fetch weather"}), 500
-
-@app.route("/process_document", methods=["POST"])
-def process_document():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
-
-    user_id = request.form.get('user_id')
-    user_input = request.form.get('user_input', '')
-    latitude = request.form.get('latitude')
-    longitude = request.form.get('longitude')
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
-
     try:
-        filename = secure_filename(file.filename)
-        temp_path = os.path.join(tempfile.gettempdir(), filename)
-        file.save(temp_path)
+        data = request.get_json()
+        user_input = data.get('user_input')
+        user_id = data.get('user_id')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
 
-        extension = filename.rsplit('.', 1)[1].lower()
-        if extension == 'pdf':
-            text = Max.process_pdf(temp_path)
-        elif extension == 'docx':
-            text = Max.process_docx(temp_path)
-        elif extension == 'txt':
-            text = Max.process_text_file(temp_path)
+        if not user_input or not user_id:
+            return jsonify({'error': 'user_input and user_id are required'}), 400
+
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        conversation_history = user_data.get('conversation_history', [])
+        response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+
+        if response.startswith('[GENERATE_IMAGE:'):
+            image_prompt = response[len('[GENERATE_IMAGE:'):-1].strip()
+            from Max import generate_image
+            image_base64 = generate_image(image_prompt)
+            if image_base64:
+                response_data = {'response': 'Here’s the image you requested!', 'image_base64': image_base64}
+            else:
+                response_data = {'response': 'Sorry, I couldn’t generate the image. Try again? 😅'}
         else:
-            text = None
+            response_data = {'response': response}
 
-        os.remove(temp_path)
+        conversation_history.append({'user': user_input, 'max': response_data['response']})
+        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
 
-        if text:
-            user_data = Max.get_user_data(user_id)
-            if not user_data:
-                return jsonify({"error": "User not found"}), 404
-
-            conversation_history = user_data.get("conversation_history", [])
-            if not isinstance(conversation_history, list):
-                conversation_history = []
-
-            response_text = Max.process_document_with_gemini(
-                user_id,
-                text,
-                user_input,
-                conversation_history,
-                latitude=latitude,
-                longitude=longitude
-            )
-            if response_text:
-                conversation_history.append({"user": f"{user_input or 'Uploaded file: ' + filename}", "max": response_text})
-                Max.save_conversation_history(user_id, conversation_history)
-                return jsonify({"response": response_text})
-            return jsonify({"error": "Failed to process document content"}), 500
-        return jsonify({"error": "Failed to extract text from document"}), 500
-
+        return jsonify(response_data), 200
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        print(f"[Document Processing Error] {e}")
-        return jsonify({"error": "Error processing document"}), 500
+        print(f"[Chat Error] {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-@app.route("/process_image", methods=["POST"])
+@app.route('/process_image', methods=['POST'])
 def process_image():
-    data = request.get_json()
-    user_input = data.get("user_input")
-    user_id = data.get("user_id")
-    image_base64 = data.get("image_base64")
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
+    try:
+        data = request.get_json()
+        user_input = data.get('user_input')
+        user_id = data.get('user_id')
+        image_base64 = data.get('image_base64')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
 
-    if not user_input or not user_id or not image_base64:
-        return jsonify({"error": "Missing user_input, user_id, or image_base64"}), 400
+        if not user_input or not user_id or not image_base64:
+            return jsonify({'error': 'user_input, user_id, and image_base64 are required'}), 400
 
-    user_data = Max.get_user_data(user_id)
-    if not user_data:
-        return jsonify({"error": "User not found"}), 404
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
 
-    conversation_history = user_data.get("conversation_history", [])
-    if not isinstance(conversation_history, list):
-        conversation_history = []
+        conversation_history = user_data.get('conversation_history', [])
+        response = process_image_with_gemini(user_input, image_base64, conversation_history, user_data.get('memories', []), user_id, mime_type="image/png", latitude=latitude, longitude=longitude)
 
-    response_text = Max.generate_gemini_response(
-        user_data,
-        user_input,
-        conversation_history,
-        image_data=image_base64,
-        mime_type="image/png",
-        latitude=latitude,
-        longitude=longitude
-    )
+        conversation_history.append({'user': user_input, 'max': response})
+        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
 
-    conversation_history.append({"user": user_input, "max": response_text})
-    Max.save_conversation_history(user_id, conversation_history)
+        return jsonify({'response': response}), 200
+    except Exception as e:
+        print(f"[Process Image Error] {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-    return jsonify({"response": response_text})
+@app.route('/process_document', methods=['POST'])
+def process_document():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
 
-@app.route("/generate_quiz", methods=["GET"])
+        file = request.files['file']
+        user_id = request.form.get('user_id')
+        user_input = request.form.get('user_input', '')
+        latitude = request.form.get('latitude')
+        longitude = request.form.get('longitude')
+
+        if not file or not user_id or file.filename == '':
+            return jsonify({'error': 'File and user_id are required'}), 400
+
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'File type not allowed. Use pdf, docx, or txt'}), 400
+
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+
+        if filename.endswith('.pdf'):
+            document_text = process_pdf(file_path)
+        elif filename.endswith('.docx'):
+            document_text = process_docx(file_path)
+        elif filename.endswith('.txt'):
+            document_text = process_text_file(file_path)
+        else:
+            os.remove(file_path)
+            return jsonify({'error': 'Unsupported file type'}), 400
+
+        os.remove(file_path)
+
+        if not document_text:
+            return jsonify({'error': 'Failed to process document'}), 500
+
+        conversation_history = user_data.get('conversation_history', [])
+        response = process_document_with_gemini(user_id, document_text, user_input, conversation_history, user_data.get('memories', []), latitude=latitude, longitude=longitude)
+
+        conversation_history.append({'user': user_input, 'max': response})
+        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
+
+        return jsonify({'response': response}), 200
+    except Exception as e:
+        print(f"[Process Document Error] {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/clear_chat', methods=['POST'])
+def clear_chat():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        user_ref = db.collection('users').document(user_id)
+        user_ref.update({'conversation_history': []})
+        return jsonify({'message': 'Chat history cleared successfully'}), 200
+    except Exception as e:
+        print(f"[Clear Chat Error] {e}")
+        return jsonify({'error': 'Failed to clear chat history'}), 500
+
+@app.route('/generate_quiz', methods=['POST'])
 def generate_quiz():
-    user_id = request.args.get("user_id")
-    topic = request.args.get("topic")
-    if not user_id:
-        return jsonify({"error": "user_id required"}), 400
-    quiz = Quiz.generate_quiz_question(user_id, topic)
-    if 'error' in quiz:
-        return jsonify(quiz), 500
-    return jsonify(quiz)
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        topic = data.get('topic')
 
-@app.route("/submit_quiz_answer", methods=["POST"])
-def submit_quiz_answer():
-    data = request.get_json()
-    user_id = data.get("user_id")
-    question_id = data.get("question_id")
-    user_answer = data.get("user_answer")
-    if not all([user_id, question_id, user_answer]):
-        return jsonify({"error": "Missing required fields"}), 400
-    result = Quiz.check_answer(user_id, question_id, user_answer)
-    if 'error' in result:
-        return jsonify(result), 404
-    return jsonify({"is_correct": result.get("result") == "correct"})
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        quiz_data = generate_quiz_question(db, user_id, topic)
+        if 'error' in quiz_data:
+            return jsonify({'error': quiz_data['error']}), 500
+
+        return jsonify(quiz_data), 200
+    except Exception as e:
+        print(f"[Generate Quiz Error] {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/check_answer', methods=['POST'])
+def check_answer_endpoint():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        question_id = data.get('question_id')
+        user_answer = data.get('user_answer')
+
+        if not user_id or not question_id or not user_answer:
+            return jsonify({'error': 'user_id, question_id, and user_answer are required'}), 400
+
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        result = check_answer(db, user_id, question_id, user_answer)
+        if 'error' in result:
+            return jsonify({'error': result['error']}), 404
+
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"[Check Answer Error] {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
