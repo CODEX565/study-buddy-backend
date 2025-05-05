@@ -5,6 +5,7 @@ from Max import generate_gemini_response, process_image_with_gemini, process_doc
 from Quiz import generate_quiz_question, check_answer
 import os
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -158,6 +159,37 @@ def clear_chat():
         print(f"[Clear Chat Error] {e}")
         return jsonify({'error': 'Failed to clear chat history'}), 500
 
+@app.route('/get_user_data', methods=['POST'])
+def get_user_data():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return jsonify({'error': 'User not found'}), 404
+
+        user_data = user_doc.to_dict()
+        memories = user_data.get('memories', [])
+        study_topic = None
+        for memory in memories:
+            if memory.get('type') == 'study_topic':
+                study_topic = memory.get('value')
+                break
+
+        response_data = {
+            'age': user_data.get('age', None),
+            'study_topic': study_topic
+        }
+        print(f"[Get User Data] Fetched for user {user_id}: {response_data}")
+        return jsonify(response_data), 200
+    except Exception as e:
+        print(f"[Get User Data Error] {e}")
+        return jsonify({'error': 'Failed to fetch user data'}), 500
+
 @app.route('/generate_quiz', methods=['POST'])
 def generate_quiz():
     try:
@@ -173,7 +205,7 @@ def generate_quiz():
             return jsonify({'error': 'User not found'}), 404
 
         quiz_data = generate_quiz_question(db, user_id, topic)
-        print(f"[Generate Quiz] Response: {quiz_data}")  # Added logging
+        print(f"[Generate Quiz] Response: {quiz_data}")
         if 'error' in quiz_data:
             return jsonify({'error': quiz_data['error']}), 500
 
@@ -198,7 +230,7 @@ def check_answer_endpoint():
             return jsonify({'error': 'User not found'}), 404
 
         result = check_answer(db, user_id, question_id, user_answer)
-        print(f"[Check Answer] Response: {result}")  # Added logging
+        print(f"[Check Answer] Response: {result}")
         if 'error' in result:
             return jsonify({'error': result['error']}), 404
 
@@ -206,6 +238,39 @@ def check_answer_endpoint():
     except Exception as e:
         print(f"[Check Answer Error] {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/save_quiz_score', methods=['POST'])
+def save_quiz_score():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        score = data.get('score')
+        total_questions = data.get('total_questions')
+        topic = data.get('topic', 'General')
+
+        if not user_id or score is None or total_questions is None:
+            return jsonify({'error': 'user_id, score, and total_questions are required'}), 400
+
+        user_ref = db.collection('users').document(user_id)
+        user_data = user_ref.get()
+        if not user_data.exists:
+            return jsonify({'error': 'User not found'}), 404
+
+        quiz_score_entry = {
+            'score': score,
+            'total_questions': total_questions,
+            'topic': topic,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        user_ref.update({
+            'quiz_scores': firestore.ArrayUnion([quiz_score_entry])
+        })
+        print(f"[Save Quiz Score] Saved for user {user_id}: {quiz_score_entry}")
+
+        return jsonify({'message': 'Quiz score saved successfully'}), 200
+    except Exception as e:
+        print(f"[Save Quiz Score Error] {e}")
+        return jsonify({'error': 'Failed to save quiz score'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -34,7 +34,7 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
         quiz_history = get_quiz_history(db, user_id)
         memories = user_data.get('memories', [])
         
-        # Determine topic: prioritize study_topic from memories, then study_goal, then default
+        # Determine topic
         effective_topic = topic
         if not effective_topic:
             for memory in memories:
@@ -84,13 +84,12 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
                 if hasattr(part, "text") and part.text:
                     text += part.text
 
-            # Try to extract JSON from markdown or raw text
+            # Extract JSON
             start_idx = text.find("```json")
             end_idx = text.find("```", start_idx + 7) if start_idx != -1 else -1
             if start_idx != -1 and end_idx != -1:
                 json_text = text[start_idx + 7:end_idx].strip()
             else:
-                # Fallback: try to find JSON-like content
                 start_idx = text.find("{")
                 end_idx = text.rfind("}") + 1
                 json_text = text[start_idx:end_idx].strip() if start_idx != -1 and end_idx != -1 else text.strip()
@@ -116,22 +115,25 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
                 question_id = str(uuid.uuid4())
                 question_data['question_id'] = question_id
 
-                # Save to Firebase (both quiz_history and quizzes collection)
-                save_quiz_to_history(db, user_id, question_data)
-                db.collection('quizzes').document(question_id).set({
-                    "user_id": user_id,
-                    "topic": effective_topic,
+                # Save to quiz_history
+                history_entry = {
+                    "question_id": question_id,
                     "question": question_data['question'],
                     "answers": question_data['answers'],
                     "correct_answer": question_data['correct_answer'],
+                    "topic": effective_topic,
                     "timestamp": datetime.now().isoformat()
+                }
+                db.collection('users').document(user_id).update({
+                    "quiz_history": firestore.ArrayUnion([history_entry])
                 })
+                print(f"[Quiz] Saved to quiz_history: {history_entry}")
 
                 return {
                     "question_id": question_id,
                     "question": question_data['question'],
                     "answers": question_data['answers'],
-                    "correct_answer": question_data['correct_answer'],  # Added to match frontend
+                    "correct_answer": question_data['correct_answer'],
                     "topic": effective_topic
                 }
 
@@ -156,6 +158,7 @@ def save_quiz_response(db, user_id, question_id, user_answer, is_correct):
                 "timestamp": firestore.SERVER_TIMESTAMP
             }
         })
+        print(f"[Quiz] Saved to quiz_responses: {{question_id: {question_id}, answer: {user_answer}, is_correct: {is_correct}}}")
     except Exception as e:
         print(f"[Firestore Error] {e}")
 
@@ -188,21 +191,11 @@ def get_study_goal(db, user_id):
 
 def check_answer(db, user_id, question_id, user_answer):
     try:
-        # Check quizzes collection first (used in main.py)
-        question_doc = db.collection('quizzes').document(question_id).get()
-        if question_doc.exists:
-            question_data = question_doc.to_dict()
-            if question_data['user_id'] != user_id:
-                return {"error": "Unauthorized access to question"}
-            correct_answer = question_data['correct_answer']
-            is_correct = user_answer == correct_answer
-            save_quiz_response(db, user_id, question_id, user_answer, is_correct)
-            return {
-                "result": "correct" if is_correct else "incorrect",
-                "correct_answer": correct_answer
-            }
+        user_ref = db.collection('users').document(user_id)
+        user_data = user_ref.get().to_dict()
+        if not user_data:
+            return {"error": "User not found"}
 
-        # Fallback to quiz_history
         quiz_history = get_quiz_history(db, user_id)
         for question in quiz_history:
             if question.get('question_id') == question_id:
