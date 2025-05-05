@@ -53,13 +53,64 @@ def save_conversation_history(user_id, history):
     except Exception as e:
         print(f"[Firestore Update Error] {e}")
 
+def evaluate_memory_worth(user_id, memory_type, memory_value):
+    """
+    Evaluate if a memory is worth saving based on relevance and specificity.
+    More lenient for user preferences like likes/dislikes/favorites.
+    Returns True if worth saving, False otherwise.
+    """
+    # Skip overly generic or empty inputs
+    generic_terms = ['it', 'them', 'stuff', 'things', 'something', '']
+    if memory_value.lower().strip() in generic_terms:
+        return False
+    
+    # Check for redundancy
+    user_data = get_user_data(user_id)
+    existing_memories = user_data.get('memories', []) if user_data else []
+    for mem in existing_memories:
+        if mem['type'] == memory_type and mem['value'].lower() == memory_value.lower():
+            return False
+    
+    # Lenient rules for preferences
+    if memory_type in ['likes', 'dislikes'] or memory_type.startswith('favorite_'):
+        # Allow single words or short phrases, max 30 characters
+        if len(memory_value) <= 30:
+            return True
+    
+    # Stricter rules for projects/tasks/study topics
+    if memory_type in ['project', 'task', 'study_topic']:
+        # Require at least 2 words, max 50 characters
+        if len(memory_value.split()) >= 2 and len(memory_value) <= 50:
+            return True
+    
+    return False
+
+def summarize_memory(memory_value):
+    """
+    Summarize the memory to make it concise and meaningful.
+    """
+    memory_value = re.sub(r'\s+', ' ', memory_value.strip())
+    words = memory_value.split()
+    if len(words) > 15:
+        return ' '.join(words[:15]) + '...'
+    return memory_value
+
 def save_user_memory(user_id, memory):
     try:
+        memory_value = summarize_memory(memory['value'])
+        if not evaluate_memory_worth(user_id, memory['type'], memory_value):
+            print(f"[Memory Skipped] {memory} - Not worth saving")
+            return
+        
         user_ref = db.collection('users').document(user_id)
         user_ref.update({
-            "memories": firestore.ArrayUnion([memory])
+            "memories": firestore.ArrayUnion([{
+                "type": memory['type'],
+                "value": memory_value,
+                "timestamp": memory['timestamp']
+            }])
         })
-        print(f"[Memory Saved] {memory}")
+        print(f"[Memory Saved] {{'type': '{memory['type']}', 'value': '{memory_value}', 'timestamp': '{memory['timestamp']}'}}")
     except Exception as e:
         print(f"[Firestore Memory Error] {e}")
 
@@ -81,18 +132,25 @@ def process_user_input(user_input, user_data):
                 print(f"✅ Updated {key.replace('_', ' ')} to '{value}'.")
     return updated
 
-def detect_memories(user_input):
+def detect_memories(user_input, user_id):
+    """
+    Detect meaningful memories from user input, focusing on projects, tasks, study topics, and user preferences.
+    """
     memory_patterns = [
+        (r"(?:working on|building|studying|project is|task is)\s+([a-zA-Z\s\-]+)", "project"),
+        (r"(?:need to|have to|planning to)\s+(?:study|work on|complete)\s+([a-zA-Z\s\-]+)", "task"),
+        (r"(?:learning about|reading about|interested in)\s+([a-zA-Z\s\-]+)", "study_topic"),
         (r"(?:i like|love|enjoy|fan of)\s+([a-zA-Z\s]+)", "likes"),
         (r"(?:i hate|dislike|not a fan of)\s+([a-zA-Z\s]+)", "dislikes"),
         (r"(?:my favorite)\s+(?:artist|band|singer|music)\s+is\s+([a-zA-Z\s]+)", "favorite_music"),
+        (r"(?:my favorite)\s+(?:car|vehicle)\s+is\s+([a-zA-Z0-9\s]+)", "favorite_car"),
     ]
     memories = []
     for pattern, memory_type in memory_patterns:
         match = re.search(pattern, user_input, re.IGNORECASE)
         if match:
             value = match.group(1).strip()
-            memories.append({"type": memory_type, "value": value, "timestamp": datetime.now().isoformat()})
+            memories.append({"type": memory_type, "value": value, "timestamp": datetime.now().isoformat(), "user_id": user_id})
     return memories
 
 def generate_image(prompt, max_retries=3):
@@ -189,8 +247,8 @@ Current date: {current_date}
 Analyze the provided image and incorporate the user's text in your response.
 Use the conversation history and user memories to maintain context and personalize responses.
 Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
-If the user switches topics, transition smoothly and keep the response realistic and human-like.
-If the user mentions preferences (e.g., liking an artist), include [SAVE_MEMORY: type=value] in your response to save it.
+If the user switches topics, transition cleanly and keep the response realistic and human-like.
+If the user mentions a project, task, study topic, or preference (e.g., liking a car), include [SAVE_MEMORY: type=value] (e.g., [SAVE_MEMORY: favorite_car=BMW M4]).
 Respond in a witty, helpful, human-like way, using the weather and time context only if relevant to the image or user request.
 Keep the response short, warm, and natural. Use emojis to make it engaging.
 """
@@ -220,6 +278,11 @@ Keep the response short, warm, and natural. Use emojis to make it engaging.
             memory_type, memory_value = memory_match.groups()
             save_user_memory(user_id, {"type": memory_type, "value": memory_value, "timestamp": datetime.now().isoformat()})
             text = re.sub(r"\[SAVE_MEMORY:[^\]]+\]", "", text).strip()
+
+        # Detect additional memories from user input
+        detected_memories = detect_memories(user_input, user_id)
+        for memory in detected_memories:
+            save_user_memory(user_id, memory)
 
         return text or "Hmm, I couldn't process that image!"
     except Exception as e:
@@ -262,8 +325,8 @@ The user has uploaded a document with the following content:
 Summarize what the document is about and incorporate the user's text in your response.
 Use the conversation history and user memories to maintain context and personalize responses.
 Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
-If the user switches topics, transition smoothly and keep the response realistic and human-like.
-If the user mentions preferences (e.g., liking an artist), include [SAVE_MEMORY: type=value] in your response to save it.
+If the user switches topics, transition cleanly and keep the response realistic and human-like.
+If the document or user input mentions a project, task, study topic, or preference, include [SAVE_MEMORY: type=value] (e.g., [SAVE_MEMORY: favorite_car=BMW M4]).
 Use the weather and time context only if relevant to the document or user request.
 Suggest what the user might want to do with it (e.g., study, quiz, summarize).
 Keep the response short, warm, and natural. Use emojis to make it engaging.
@@ -292,6 +355,11 @@ Recent conversation:
             memory_type, memory_value = memory_match.groups()
             save_user_memory(user_id, {"type": memory_type, "value": memory_value, "timestamp": datetime.now().isoformat()})
             text = re.sub(r"\[SAVE_MEMORY:[^\]]+\]", "", text).strip()
+
+        # Detect additional memories from user input
+        detected_memories = detect_memories(user_input, user_id)
+        for memory in detected_memories:
+            save_user_memory(user_id, memory)
 
         return text or "Hmm, I couldn't process that document!"
     except Exception as e:
@@ -331,7 +399,7 @@ def generate_gemini_response(user_data, user_input, conversation_history, user_i
     memories_text = "\n".join([f"{m['type']}: {m['value']}" for m in user_data.get('memories', [])[-3:]]) if user_data.get('memories') else "No memories available"
 
     # Detect memories from user input
-    detected_memories = detect_memories(user_input)
+    detected_memories = detect_memories(user_input, user_id)
     for memory in detected_memories:
         save_user_memory(user_id, memory)
 
@@ -365,8 +433,8 @@ Instructions:
 - Otherwise, respond like a helpful, witty, supportive friend.
 - Use the conversation history and user memories to maintain context and personalize responses.
 - Avoid using greetings like "Hey [Name]" unless it's the first message in a new conversation.
-- If the user switches topics, transition smoothly and keep the response realistic and human-like.
-- If the user mentions preferences (e.g., "I like Juice WRLD"), include [SAVE_MEMORY: type=value] in your response to save it (e.g., [SAVE_MEMORY: likes=Juice WRLD]).
+- If the user switches topics, transition cleanly and keep the response realistic and human-like.
+- If the user mentions a project, task, study topic, or preference (e.g., liking a car), include [SAVE_MEMORY: type=value] (e.g., [SAVE_MEMORY: favorite_car=BMW M4]).
 - Use the weather and time context only if relevant to the user’s request or to enhance the response.
 - Keep responses short, warm, and natural.
 - If navigation is requested, reply with the command (e.g., "go_to_quiz_screen").
