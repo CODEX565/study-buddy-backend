@@ -173,6 +173,7 @@ def generate_quiz():
             return jsonify({'error': 'User not found'}), 404
 
         quiz_data = generate_quiz_question(db, user_id, topic)
+        print(f"[Generate Quiz] Response: {quiz_data}")  # Added logging
         if 'error' in quiz_data:
             return jsonify({'error': quiz_data['error']}), 500
 
@@ -197,6 +198,7 @@ def check_answer_endpoint():
             return jsonify({'error': 'User not found'}), 404
 
         result = check_answer(db, user_id, question_id, user_answer)
+        print(f"[Check Answer] Response: {result}")  # Added logging
         if 'error' in result:
             return jsonify({'error': result['error']}), 404
 

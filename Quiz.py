@@ -131,6 +131,7 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
                     "question_id": question_id,
                     "question": question_data['question'],
                     "answers": question_data['answers'],
+                    "correct_answer": question_data['correct_answer'],  # Added to match frontend
                     "topic": effective_topic
                 }
 
