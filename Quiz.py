@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from firebase_admin import firestore
+from datetime import datetime
+from Max import save_user_memory
 
 # Load environment variables
 load_dotenv()
@@ -18,27 +20,55 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 MAX_RETRIES = 5
 
 def generate_quiz_question(db, user_id, topic=None, retry_count=0):
-    quiz_history = get_quiz_history(db, user_id)
-    study_goal = get_study_goal(db, user_id) if not topic else None
-    effective_topic = topic or study_goal or 'programming and coding'
-
-    history_str = ""
-    for i, question in enumerate(quiz_history):
-        history_str += f"Question {i+1}: {question['question']} | Answers: {', '.join(question['answers'])} | Correct Answer: {question['correct_answer']}\n"
-
-    prompt = f"""
-    Generate a brand new random quiz question about {effective_topic}.
-    Only one answer should be correct. Return strictly in this JSON format:
-    {{
-      "question": "What is the capital of Australia?",
-      "answers": ["Sydney", "Melbourne", "Canberra", "Perth"],
-      "correct_answer": "Canberra"
-    }}
-    Do not repeat previous questions. Here is the previous quiz history:
-    {history_str}
     """
-
+    Generate a unique multiple-choice quiz question for the given user and topic.
+    Prioritizes study_topic from memories, then study_goal, then defaults to 'programming and coding'.
+    Saves topic as study_topic memory if provided.
+    """
     try:
+        # Fetch user data
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            return {"error": "User not found"}
+
+        quiz_history = get_quiz_history(db, user_id)
+        memories = user_data.get('memories', [])
+        
+        # Determine topic: prioritize study_topic from memories, then study_goal, then default
+        effective_topic = topic
+        if not effective_topic:
+            for memory in memories:
+                if memory['type'] == 'study_topic':
+                    effective_topic = memory['value']
+                    break
+        if not effective_topic:
+            effective_topic = get_study_goal(db, user_id) or 'programming and coding'
+
+        # Save topic as study_topic memory if provided
+        if topic:
+            save_user_memory(user_id, {
+                "type": "study_topic",
+                "value": topic,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        # Format quiz history for prompt
+        history_str = ""
+        for i, question in enumerate(quiz_history):
+            history_str += f"Question {i+1}: {question['question']} | Answers: {', '.join(question['answers'])} | Correct Answer: {question['correct_answer']}\n"
+
+        prompt = f"""
+        Generate a brand new random quiz question about {effective_topic}.
+        Only one answer should be correct. Return strictly in this JSON format:
+        {{
+          "question": "What is the capital of Australia?",
+          "answers": ["Sydney", "Melbourne", "Canberra", "Perth"],
+          "correct_answer": "Canberra"
+        }}
+        Do not repeat previous questions. Here is the previous quiz history:
+        {history_str}
+        """
+
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=prompt,
@@ -54,32 +84,54 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
                 if hasattr(part, "text") and part.text:
                     text += part.text
 
+            # Try to extract JSON from markdown or raw text
             start_idx = text.find("```json")
-            end_idx = text.find("```", start_idx + 7)
-
+            end_idx = text.find("```", start_idx + 7) if start_idx != -1 else -1
             if start_idx != -1 and end_idx != -1:
                 json_text = text[start_idx + 7:end_idx].strip()
             else:
-                json_text = text.strip()
+                # Fallback: try to find JSON-like content
+                start_idx = text.find("{")
+                end_idx = text.rfind("}") + 1
+                json_text = text[start_idx:end_idx].strip() if start_idx != -1 and end_idx != -1 else text.strip()
 
             try:
                 question_data = json.loads(json_text)
 
+                # Validate response format
+                if not all(key in question_data for key in ['question', 'answers', 'correct_answer']):
+                    return {"error": "Invalid quiz question format"}
+                if len(question_data['answers']) != 4 or question_data['correct_answer'] not in question_data['answers']:
+                    return {"error": "Invalid answers or correct_answer"}
+
+                # Check for duplicates
                 for question in quiz_history:
                     if question['question'] == question_data['question']:
                         print(f"[Duplicate Question] {question_data['question']}")
                         if retry_count < MAX_RETRIES:
                             return generate_quiz_question(db, user_id, topic, retry_count + 1)
-                        return {"error": "Unable to generate unique quiz question"}
+                        return {"error": "Unable to generate unique quiz question after max retries"}
 
-                question_data['question_id'] = str(uuid.uuid4())
+                # Generate and add question ID
+                question_id = str(uuid.uuid4())
+                question_data['question_id'] = question_id
+
+                # Save to Firebase (both quiz_history and quizzes collection)
                 save_quiz_to_history(db, user_id, question_data)
-
-                return {
+                db.collection('quizzes').document(question_id).set({
+                    "user_id": user_id,
+                    "topic": effective_topic,
                     "question": question_data['question'],
                     "answers": question_data['answers'],
                     "correct_answer": question_data['correct_answer'],
-                    "question_id": question_data['question_id']
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                return {
+                    "question_id": question_id,
+                    "question": question_data['question'],
+                    "answers": question_data['answers'],
+                    "topic": effective_topic
                 }
 
             except json.JSONDecodeError as e:
@@ -134,13 +186,35 @@ def get_study_goal(db, user_id):
         return None
 
 def check_answer(db, user_id, question_id, user_answer):
-    quiz_history = get_quiz_history(db, user_id)
-
-    for question in quiz_history:
-        if question.get('question_id') == question_id:
-            correct_answer = question.get('correct_answer')
+    try:
+        # Check quizzes collection first (used in main.py)
+        question_doc = db.collection('quizzes').document(question_id).get()
+        if question_doc.exists:
+            question_data = question_doc.to_dict()
+            if question_data['user_id'] != user_id:
+                return {"error": "Unauthorized access to question"}
+            correct_answer = question_data['correct_answer']
             is_correct = user_answer == correct_answer
             save_quiz_response(db, user_id, question_id, user_answer, is_correct)
-            return {"result": "correct" if is_correct else "incorrect"}
+            return {
+                "result": "correct" if is_correct else "incorrect",
+                "correct_answer": correct_answer
+            }
 
-    return {"error": "Question not found in history"}
+        # Fallback to quiz_history
+        quiz_history = get_quiz_history(db, user_id)
+        for question in quiz_history:
+            if question.get('question_id') == question_id:
+                correct_answer = question.get('correct_answer')
+                is_correct = user_answer == correct_answer
+                save_quiz_response(db, user_id, question_id, user_answer, is_correct)
+                return {
+                    "result": "correct" if is_correct else "incorrect",
+                    "correct_answer": correct_answer
+                }
+
+        return {"error": "Question not found"}
+
+    except Exception as e:
+        print(f"[Check Answer Error] {e}")
+        return {"error": "Failed to check answer"}
