@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import random
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -23,6 +24,7 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
     """
     Generate a unique multiple-choice quiz question for the given user and topic.
     Prioritizes study_topic from memories, then study_goal, then defaults to 'programming and coding'.
+    If topic is 'General', selects a random topic from a predefined list.
     Saves topic as study_topic memory if provided.
     """
     try:
@@ -34,9 +36,23 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
         quiz_history = get_quiz_history(db, user_id)
         memories = user_data.get('memories', [])
         
+        # Define possible topics for General quizzes
+        general_topics = [
+            'Python',
+            'JavaScript',
+            'Algorithms',
+            'Data Structures',
+            'Databases',
+            'Mathematics',
+            'Physics',
+            'History'
+        ]
+
         # Determine topic
         effective_topic = topic
-        if not effective_topic:
+        if effective_topic == 'General':
+            effective_topic = random.choice(general_topics)
+        elif not effective_topic:
             for memory in memories:
                 if memory['type'] == 'study_topic':
                     effective_topic = memory['value']
@@ -44,8 +60,8 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
         if not effective_topic:
             effective_topic = get_study_goal(db, user_id) or 'programming and coding'
 
-        # Save topic as study_topic memory if provided
-        if topic:
+        # Save topic as study_topic memory if provided (but not for General to avoid overwriting)
+        if topic and topic != 'General':
             save_user_memory(user_id, {
                 "type": "study_topic",
                 "value": topic,
