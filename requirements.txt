@@ -2,7 +2,7 @@ fastapi
 uvicorn
 google-generativeai
 speechrecognition
-playsound
+
 APScheduler
 python-dotenv
 requests
