@@ -144,6 +144,7 @@ def get_user_flashcards(db, user_id, topic=None, status=None):
             query = query.where('topic', '==', topic)
         if status:
             query = query.where('status', '==', status)
+        query = query.order_by('created_at', direction=firestore.Query.DESCENDING)
         docs = query.stream()
         flashcards = [doc.to_dict() for doc in docs]
         logger.debug(f"Fetched {len(flashcards)} flashcards for user_id: {user_id}")

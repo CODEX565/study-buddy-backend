@@ -207,15 +207,50 @@ def get_user_data_endpoint():
             logger.error("Missing user_id in get_user_data request")
             return jsonify({'error': 'user_id is required'}), 400
         logger.info(f"Fetching user data for user_id: {user_id}")
-        result = get_user_data(db, user_id)
-        if 'error' in result:
-            logger.warning(f"User data error: {result['error']}")
-            return jsonify({'error': result['error']}), 404
-        logger.debug(f"Fetched user data for user_id: {user_id}: {result}")
-        return jsonify(result), 200
+        user_doc = db.collection('users').document(user_id).get()
+        if not user_doc.exists:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
+        user_data = user_doc.to_dict()
+        response_data = {
+            'age': user_data.get('age'),
+            'year_group': user_data.get('year_group'),
+            'study_topic': user_data.get('study_topic'),
+            'display_name': user_data.get('display_name')
+        }
+        logger.debug(f"Fetched user data for user_id: {user_id}: {response_data}")
+        return jsonify(response_data), 200
     except Exception as e:
         logger.exception(f"Get user data error for user_id: {user_id}: {str(e)}")
         return jsonify({'error': f'Failed to fetch user data: {str(e)}'}), 500
+
+@app.route('/set_display_name', methods=['POST'])
+def set_display_name():
+    try:
+        data = request.get_json()
+        if not data:
+            logger.error("No JSON data provided in set_display_name request")
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+        user_id = data.get('user_id')
+        display_name = data.get('display_name')
+        if not user_id or not display_name:
+            logger.error(f"Missing required fields: user_id={user_id}, display_name={display_name}")
+            return jsonify({'error': 'user_id and display_name are required'}), 400
+        if len(display_name.strip()) < 2:
+            logger.error(f"Invalid display_name: {display_name}")
+            return jsonify({'error': 'Display name must be at least 2 characters'}), 400
+        logger.info(f"Setting display name for user_id: {user_id}, display_name: {display_name}")
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
+        user_ref.update({'display_name': display_name.strip()})
+        logger.debug(f"Display name set for user_id: {user_id}")
+        return jsonify({'message': 'Display name set successfully'}), 200
+    except Exception as e:
+        logger.exception(f"Set display name error for user_id: {user_id}: {str(e)}")
+        return jsonify({'error': f'Failed to set display name: {str(e)}'}), 500
 
 @app.route('/clear_study_topic', methods=['POST'])
 def clear_study_topic():
@@ -311,6 +346,7 @@ def save_quiz_score_endpoint():
         topic = data.get('topic', 'General')
         year_group = data.get('year_group', 'General')
         results = data.get('results', [])
+        quiz_id = data.get('quiz_id', str(uuid.uuid4()))
         if not user_id or score is None or total_questions is None:
             logger.error(f"Missing required fields: user_id={user_id}, score={score}, total_questions={total_questions}")
             return jsonify({'error': 'user_id, score, and total_questions are required'}), 400
@@ -319,7 +355,7 @@ def save_quiz_score_endpoint():
         if not user_data:
             logger.warning(f"User not found: {user_id}")
             return jsonify({'error': 'User not found'}), 404
-        save_quiz_score(db, user_id, score, total_questions, topic, year_group, results)
+        save_quiz_score(db, user_id, score, total_questions, topic, year_group, results, quiz_id)
         logger.debug(f"Saved quiz score for user_id: {user_id}: {score}/{total_questions}")
         return jsonify({'message': 'Quiz score saved successfully'}), 200
     except Exception as e:
@@ -339,6 +375,10 @@ def generate_flashcards_from_quiz_endpoint():
             logger.error("Missing user_id in generate_flashcards_from_quiz request")
             return jsonify({'error': 'user_id is required'}), 400
         logger.info(f"Generating flashcards from quiz for user_id: {user_id}, topic: {topic}")
+        user_ref = db.collection('users').document(user_id)
+        if not user_ref.get().exists:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
         flashcards = generate_flashcards_from_quiz(db, user_id, topic)
         if not flashcards:
             logger.warning(f"No flashcards generated for user_id: {user_id}")
