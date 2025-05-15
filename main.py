@@ -1,17 +1,14 @@
 import logging
 from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO
 import firebase_admin
 from firebase_admin import credentials, firestore
 from Max import generate_gemini_response, process_image_with_gemini, process_document_with_gemini, process_pdf, process_docx, process_text_file, generate_image
-from Quiz import generate_quiz_question, check_answer
+from Quiz import generate_quiz_question, check_answer, get_user_data, save_quiz_score
 from flashcards import generate_flashcards_from_quiz, generate_flashcards_from_document, generate_flashcards_from_input, get_user_flashcards, update_flashcard_status
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
-import multiplayer
-from threading import Lock
-import uuid
 from gemini_image_processor import image_processor_bp
 
 logging.basicConfig(
@@ -45,48 +42,12 @@ if not os.path.exists(UPLOAD_FOLDER):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-app.register_blueprint(multiplayer.multiplayer_bp(socketio))
-
-@socketio.on('connect', namespace='/multiplayer')
-def handle_connect():
-    logger.info("Client connected to multiplayer namespace")
-
-@socketio.on('join_game', namespace='/multiplayer')
-def handle_join_game(data):
-    user_id = data.get('user_id')
-    game_code = data.get('game_code')
-    if not user_id or not game_code:
-        emit('error', {'message': 'User ID and game code are required'}, namespace='/multiplayer')
-        return
-    try:
-        with multiplayer.game_lock:
-            if game_code not in multiplayer.games:
-                emit('error', {'message': 'Game not found'}, namespace='/multiplayer')
-                return
-            join_room(game_code)
-            logger.info(f"User {user_id} joined room: {game_code}")
-            emit('game_state', {
-                'state': multiplayer.games[game_code]['state'],
-                'players': multiplayer.games[game_code]['players'],
-                'countdown': multiplayer.games[game_code]['countdown'],
-                'topic': multiplayer.games[game_code]['topic'],
-                'year_group': multiplayer.games[game_code]['year_group'],
-                'max_questions': multiplayer.games[game_code]['max_questions']
-            }, room=game_code, namespace='/multiplayer')
-    except Exception as e:
-        logger.error(f"Error in join_game WebSocket: {str(e)}")
-        emit('error', {'message': str(e)}, namespace='/multiplayer')
-
-@socketio.on('disconnect', namespace='/multiplayer')
-def handle_disconnect():
-    logger.info("Client disconnected from multiplayer namespace")
-
 @app.route('/', methods=['GET'])
 def index():
     logger.info(f"GET / request: headers={request.headers}, args={request.args}, remote_addr={request.remote_addr}")
     return jsonify({
         'status': 'Study Buddy backend running',
-        'message': 'Use POST to /api/create_game, /api/join_game, etc. for multiplayer'
+        'message': 'Use POST to /chat, /generate_quiz, /process_document, etc.'
     }), 200
 
 @app.route('/chat', methods=['POST'])
@@ -235,7 +196,7 @@ def clear_chat():
         return jsonify({'error': f'Failed to clear chat history: {str(e)}'}), 500
 
 @app.route('/get_user_data', methods=['POST'])
-def get_user_data():
+def get_user_data_endpoint():
     try:
         data = request.get_json()
         if not data:
@@ -246,24 +207,12 @@ def get_user_data():
             logger.error("Missing user_id in get_user_data request")
             return jsonify({'error': 'user_id is required'}), 400
         logger.info(f"Fetching user data for user_id: {user_id}")
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        user_data = user_doc.to_dict()
-        memories = user_data.get('memories', [])
-        study_topic = None
-        for memory in memories:
-            if memory.get('type') == 'study_topic':
-                study_topic = memory.get('value')
-                break
-        response_data = {
-            'age': user_data.get('age', None),
-            'study_topic': study_topic
-        }
-        logger.debug(f"Fetched user data for user_id: {user_id}: {response_data}")
-        return jsonify(response_data), 200
+        result = get_user_data(db, user_id)
+        if 'error' in result:
+            logger.warning(f"User data error: {result['error']}")
+            return jsonify({'error': result['error']}), 404
+        logger.debug(f"Fetched user data for user_id: {user_id}: {result}")
+        return jsonify(result), 200
     except Exception as e:
         logger.exception(f"Get user data error for user_id: {user_id}: {str(e)}")
         return jsonify({'error': f'Failed to fetch user data: {str(e)}'}), 500
@@ -285,10 +234,7 @@ def clear_study_topic():
         if not user_doc.exists:
             logger.warning(f"User not found: {user_id}")
             return jsonify({'error': 'User not found'}), 404
-        user_data = user_doc.to_dict()
-        memories = user_data.get('memories', [])
-        updated_memories = [m for m in memories if m.get('type') != 'study_topic']
-        user_ref.update({'memories': updated_memories})
+        user_ref.update({'study_topic': firestore.DELETE_FIELD})
         logger.debug(f"Study topic cleared for user_id: {user_id}")
         return jsonify({'message': 'Study topic cleared successfully'}), 200
     except Exception as e:
@@ -304,15 +250,17 @@ def generate_quiz():
             return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
         topic = data.get('topic')
+        age = data.get('age')
+        year_group = data.get('year_group')
         if not user_id:
             logger.error("Missing user_id in generate_quiz request")
             return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Generating quiz for user_id: {user_id}, topic: {topic}")
+        logger.info(f"Generating quiz for user_id: {user_id}, topic: {topic}, age: {age}, year_group: {year_group}")
         user_data = db.collection('users').document(user_id).get().to_dict()
         if not user_data:
             logger.warning(f"User not found: {user_id}")
             return jsonify({'error': 'User not found'}), 404
-        quiz_data = generate_quiz_question(db, user_id, topic)
+        quiz_data = generate_quiz_question(db, user_id, topic, age, year_group)
         logger.debug(f"Quiz response for user_id: {user_id}: {quiz_data}")
         if 'error' in quiz_data:
             logger.error(f"Quiz generation error: {quiz_data['error']}")
@@ -351,7 +299,7 @@ def check_answer_endpoint():
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @app.route('/save_quiz_score', methods=['POST'])
-def save_quiz_score():
+def save_quiz_score_endpoint():
     try:
         data = request.get_json()
         if not data:
@@ -361,27 +309,18 @@ def save_quiz_score():
         score = data.get('score')
         total_questions = data.get('total_questions')
         topic = data.get('topic', 'General')
+        year_group = data.get('year_group', 'General')
         results = data.get('results', [])
         if not user_id or score is None or total_questions is None:
             logger.error(f"Missing required fields: user_id={user_id}, score={score}, total_questions={total_questions}")
             return jsonify({'error': 'user_id, score, and total_questions are required'}), 400
-        logger.info(f"Saving quiz score for user_id: {user_id}, score: {score}/{total_questions}, topic: {topic}")
-        user_ref = db.collection('users').document(user_id)
-        user_data = user_ref.get()
-        if not user_data.exists:
+        logger.info(f"Saving quiz score for user_id: {user_id}, score: {score}/{total_questions}, topic: {topic}, year_group: {year_group}")
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
             logger.warning(f"User not found: {user_id}")
             return jsonify({'error': 'User not found'}), 404
-        quiz_score_entry = {
-            'score': score,
-            'total_questions': total_questions,
-            'topic': topic,
-            'results': results,
-            'timestamp': datetime.utcnow().isoformat()
-        }
-        user_ref.update({
-            'quiz_scores': firestore.ArrayUnion([quiz_score_entry])
-        })
-        logger.debug(f"Saved quiz score for user_id: {user_id}: {quiz_score_entry}")
+        save_quiz_score(db, user_id, score, total_questions, topic, year_group, results)
+        logger.debug(f"Saved quiz score for user_id: {user_id}: {score}/{total_questions}")
         return jsonify({'message': 'Quiz score saved successfully'}), 200
     except Exception as e:
         logger.exception(f"Save quiz score error for user_id: {user_id}: {str(e)}")
