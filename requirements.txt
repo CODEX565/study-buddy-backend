@@ -71,7 +71,6 @@ docopt==0.6.2
 docstring_parser==0.16
 einops==0.8.1
 elevenlabs==1.56.0
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 encodec==0.1.1
 exceptiongroup==1.2.2
 executing==2.2.0
@@ -90,7 +89,7 @@ flatbuffers==25.2.10
 fonttools==4.56.0
 frozenlist==1.5.0
 fsspec==2025.3.2
-future @ file:///System/Volumes/Data/SWE/Apps/DT/BuildRoots/BuildRoot2/ActiveBuildRoot/Library/Caches/com.apple.xbs/Sources/python3/python3-124/future-0.18.2-py3-none-any.whl
+future==0.18.2
 g2pkk==0.1.2
 gast==0.4.0
 geocoder==1.38.1
@@ -183,7 +182,6 @@ literalai==0.1.103
 llvmlite==0.43.0
 locket==1.0.0
 lxml==5.4.0
-macholib @ file:///System/Volumes/Data/SWE/Apps/DT/BuildRoots/BuildRoot2/ActiveBuildRoot/Library/Caches/com.apple.xbs/Sources/python3/python3-124/macholib-1.15.2-py2.py3-none-any.whl
 marisa-trie==1.2.1
 Markdown==3.7
 markdown-it-py==3.0.0
@@ -456,7 +454,6 @@ sentry-sdk==1.14.0
 shapely==2.0.7
 shellingham==1.5.4
 simple-websocket==1.1.0
-six @ file:///System/Volumes/Data/SWE/Apps/DT/BuildRoots/BuildRoot2/ActiveBuildRoot/Library/Caches/com.apple.xbs/Sources/python3/python3-124/six-1.15.0-py2.py3-none-any.whl
 sklearn-crfsuite==0.3.6
 skops==0.9.0
 slack_sdk==3.35.0
