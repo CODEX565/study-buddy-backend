@@ -16,6 +16,7 @@ from PyPDF2 import PdfReader
 from docx import Document
 import chardet
 from timezonefinder import TimezoneFinder
+import logging  # Added for logging
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +37,10 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Timezone finder for accurate local time
 tf = TimezoneFinder()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_user_data(user_id):
     try:
@@ -402,9 +407,36 @@ Recent conversation:
         return "❌ Oops! Something went wrong with the document."
 
 def generate_gemini_response(user_data, user_input, conversation_history, user_id, image_data=None, mime_type=None, latitude=None, longitude=None):
-    weather_info = get_weather(latitude, longitude) if latitude and longitude else None
-    weather_text = (f"{weather_info['description']}, {weather_info['temperature']}°C, feels like {weather_info['feels_like']}°C, {weather_info['humidity']}% humidity in {weather_info['city']}"
-                    if weather_info else "Not available")
+    # Handle weather queries first
+    weather_query = bool(re.search(r"\b(weather|forecast|temperature)\b", user_input.lower()))
+    location_match = re.search(r"\b(?:in|for|at)\s+([a-zA-Z\s]+)", user_input, re.IGNORECASE) if weather_query else None
+    location = location_match.group(1).strip() if location_match else None
+    weather_info = None
+    weather_text = "Not available"
+
+    if weather_query:
+        try:
+            if location:
+                weather_info = get_weather_by_location(location)
+                if isinstance(weather_info, str):  # Error message from get_weather_by_location
+                    return (weather_info, None)
+            elif latitude is not None and longitude is not None:
+                weather_info = get_weather(latitude, longitude)
+            else:
+                logger.warning(f"Weather query received but no location or coordinates provided for user_id: {user_id}")
+                return ("I need your location or a city name to check the weather! Enable location services or try 'weather in Paris'. 🌍", None)
+
+            if weather_info:
+                weather_text = (f"{weather_info['description']}, {weather_info['temperature']}°C, "
+                              f"feels like {weather_info['feels_like']}°C, {weather_info['humidity']}% humidity "
+                              f"in {weather_info['city']}")
+            else:
+                logger.error(f"Failed to fetch weather data for location: {location or 'lat/lon'}, user_id: {user_id}")
+                return ("Couldn't catch the forecast for that spot—try again? 🌦", None)
+        except Exception as e:
+            logger.error(f"Weather fetch error for user_id: {user_id}: {str(e)}")
+            return ("Sorry, I couldn't fetch the weather data due to an error. Try again later! 😅", None)
+
     current_time, current_date = get_local_time(latitude, longitude)
     current_time = current_time or datetime.now().astimezone().strftime("%I:%M %p")
     current_date = current_date or datetime.now().astimezone().strftime("%A, %d %B %Y")
@@ -471,7 +503,7 @@ Instructions:
 - If the user asks to create, draw, generate, paint, show, or imagine an image, picture, or scene (e.g., "draw a dragon," "create a picture of a sunset," "imagine a spaceship"), respond with a witty comment like "Whipping up a stunning [description] for you—check out these vibes! 🌟" and include [GENERATE_IMAGE: description] at the end, where description is a clear, concise summary of what to generate (e.g., "dragon flying over a castle"). Ensure the description is specific and at least 5 words long.
 - If the image request is vague (e.g., "create an image," "draw something," "a picture"), respond with a clarification like "Ooh, a picture of what? A dragon, a sunset, or something totally wild? 🎨" and do NOT include [GENERATE_IMAGE].
 - If the user asks for the time (e.g., "what time is it?"), respond with a unique, witty comment incorporating the time (e.g., "It's {current_time}, perfect for diving into those notes with some coffee! ☕"). Do NOT use static templates.
-- If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+- If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "{weather_info['city'] if weather_info else 'Your location'}'s got {weather_info['description'].lower() if weather_info else 'unknown weather'} at {weather_info['temperature'] if weather_info else '??'}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
 - For weather queries with a location (e.g., "weather in Paris"), use the provided weather data for that city. If no weather data is available, say something like "Couldn't catch the forecast for that spot—try another city? 🌍"
 - For all other requests, respond like a helpful, witty, supportive friend, crafting unique responses that feel fresh and natural.
 - Use the conversation history and user memories to maintain context and personalize responses.
@@ -481,15 +513,9 @@ Instructions:
 - Use weather and time context subtly to enhance engagement, but ONLY mention them directly if the user asks for them. For example, weave in time/weather to set the mood (e.g., "With that evening vibe, let’s tackle some study goals!").
 - Keep responses short, warm, and natural, using emojis for engagement.
 - Now this is important: Always try your best to engage the user in a friendly, human-like way. Use humor, warmth, and a touch of personality to make the conversation feel alive and enjoyable even If the user decieds to switch topics, transition cleanly and follow their lead make it more engaging the user.
+- And dont use the time or weather when not needed.
 """
     try:
-        # Handle weather queries with location
-        weather_query = bool(re.search(r"\b(weather|forecast)\b", user_input.lower()))
-        location_match = re.search(r"\b(?:in|for|at)\s+([a-zA-Z\s]+)", user_input, re.IGNORECASE) if weather_query else None
-        location = location_match.group(1).strip() if location_match else None
-        if location:
-            weather_info = get_weather_by_location(location)
-
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=prompt,
@@ -518,7 +544,7 @@ Instructions:
 
         return (text or "Hmm, I didn't quite catch that! 😅", None)
     except Exception as e:
-        print(f"[Gemini Error] {e}")
+        logger.error(f"Gemini Error for user_id: {user_id}: {str(e)}")
         return ("❌ Oops! Something went wrong.", None)
 
 def process_pdf(file_path):

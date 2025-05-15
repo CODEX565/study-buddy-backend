@@ -1,0 +1,322 @@
+2025-05-10 22:28:51,829 - INFO - Starting Flask application
+2025-05-10 22:30:55,231 - INFO - Starting Flask application
+2025-05-10 22:31:00,370 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-10 22:31:00,371 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-10 22:31:00,372 - INFO -  * Restarting with stat
+2025-05-10 22:31:12,672 - INFO - Starting Flask application
+2025-05-10 22:31:12,747 - WARNING -  * Debugger is active!
+2025-05-10 22:31:12,782 - INFO -  * Debugger PIN: 461-607-501
+2025-05-10 22:31:24,741 - INFO - Fetching user data for user_id: user123
+2025-05-10 22:31:25,826 - INFO - 192.168.4.20 - - [10/May/2025 22:31:25] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-10 22:31:26,204 - INFO - Clearing study topic for user_id: user123
+2025-05-10 22:31:26,924 - INFO - 192.168.4.20 - - [10/May/2025 22:31:26] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-10 22:31:35,765 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:31:35,768 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:31:35,966 - INFO - 192.168.4.20 - - [10/May/2025 22:31:35] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:32:29,365 - INFO - Fetching flashcards for user_id: user123, topic: Databases, status: None
+2025-05-10 22:32:29,371 - INFO - Fetching flashcards for user_id: user123, topic: Databases, status: None
+2025-05-10 22:32:29,589 - INFO - 192.168.4.20 - - [10/May/2025 22:32:29] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:32:38,963 - INFO - Fetching flashcards for user_id: user123, topic: Mathematics, status: None
+2025-05-10 22:32:38,964 - INFO - Fetching flashcards for user_id: user123, topic: Mathematics, status: None
+2025-05-10 22:32:39,122 - INFO - 192.168.4.20 - - [10/May/2025 22:32:39] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:32:42,271 - INFO - Generating flashcards from quiz for user_id: user123, topic: Mathematics
+2025-05-10 22:32:42,272 - INFO - Generating flashcards from quiz for user_id: user123, topic: Mathematics
+2025-05-10 22:32:45,487 - INFO - Generated 9 flashcards from quiz for user_id: user123
+2025-05-10 22:32:45,487 - INFO - 192.168.4.20 - - [10/May/2025 22:32:45] "POST /generate_flashcards_from_quiz HTTP/1.1" 200 -
+2025-05-10 22:32:57,861 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:32:57,863 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:32:58,017 - INFO - 192.168.4.20 - - [10/May/2025 22:32:58] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:00,852 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:00,853 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:33:01,025 - INFO - 192.168.4.20 - - [10/May/2025 22:33:01] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:04,246 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:04,247 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:04,420 - INFO - 192.168.4.20 - - [10/May/2025 22:33:04] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:06,552 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:06,554 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:06,711 - INFO - 192.168.4.20 - - [10/May/2025 22:33:06] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:07,608 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:07,608 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:07,766 - INFO - 192.168.4.20 - - [10/May/2025 22:33:07] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:12,646 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:12,647 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:12,804 - INFO - 192.168.4.20 - - [10/May/2025 22:33:12] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:13,198 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:13,201 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:13,355 - INFO - 192.168.4.20 - - [10/May/2025 22:33:13] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:13,840 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:13,840 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:13,992 - INFO - 192.168.4.20 - - [10/May/2025 22:33:13] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:14,334 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:14,334 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:14,490 - INFO - 192.168.4.20 - - [10/May/2025 22:33:14] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:22,204 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:22,207 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:33:22,409 - INFO - 192.168.4.20 - - [10/May/2025 22:33:22] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:28,142 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:28,145 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:33:28,316 - INFO - 192.168.4.20 - - [10/May/2025 22:33:28] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:29,022 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:29,023 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:33:29,180 - INFO - 192.168.4.20 - - [10/May/2025 22:33:29] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:33:29,594 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:33:29,594 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:33:29,759 - INFO - 192.168.4.20 - - [10/May/2025 22:33:29] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:34:25,812 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:34:25,824 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:34:26,046 - INFO - 192.168.4.20 - - [10/May/2025 22:34:26] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:34:42,134 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:34:42,136 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:34:42,289 - INFO - 192.168.4.20 - - [10/May/2025 22:34:42] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:34:54,025 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 324cd83c-81aa-4c98-9ab5-6b545eebdb33
+2025-05-10 22:34:54,027 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 324cd83c-81aa-4c98-9ab5-6b545eebdb33, status: review
+2025-05-10 22:34:54,180 - INFO - 192.168.4.20 - - [10/May/2025 22:34:54] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:09,188 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:09,190 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:35:09,357 - INFO - 192.168.4.20 - - [10/May/2025 22:35:09] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:09,854 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:09,855 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:35:10,005 - INFO - 192.168.4.20 - - [10/May/2025 22:35:10] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:10,661 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:10,662 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: review
+2025-05-10 22:35:10,820 - INFO - 192.168.4.20 - - [10/May/2025 22:35:10] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:11,925 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:11,926 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:35:12,094 - INFO - 192.168.4.20 - - [10/May/2025 22:35:12] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:13,039 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:13,039 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:35:13,193 - INFO - 192.168.4.20 - - [10/May/2025 22:35:13] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:13,734 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:13,735 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:35:13,891 - INFO - 192.168.4.20 - - [10/May/2025 22:35:13] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:14,082 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:14,083 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:35:14,175 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa
+2025-05-10 22:35:14,175 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d3e8fc08-5c64-4e29-a77d-b0c1143337aa, status: mastered
+2025-05-10 22:35:14,353 - INFO - 192.168.4.20 - - [10/May/2025 22:35:14] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:35:14,723 - INFO - 192.168.4.20 - - [10/May/2025 22:35:14] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:04,563 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:36:04,566 - INFO - Fetching flashcards for user_id: user123, topic: None, status: None
+2025-05-10 22:36:05,121 - INFO - 192.168.4.20 - - [10/May/2025 22:36:05] "POST /get_flashcards HTTP/1.1" 200 -
+2025-05-10 22:36:17,617 - INFO - Generating flashcards from document for user_id: user123, file: LICENSE-MIT.txt
+2025-05-10 22:36:17,646 - INFO - Generating flashcards from document for user_id: user123, topic: General
+2025-05-10 22:36:20,694 - INFO - Generated 5 flashcards from document for user_id: user123
+2025-05-10 22:36:20,697 - INFO - 192.168.4.20 - - [10/May/2025 22:36:20] "POST /generate_flashcards_from_document HTTP/1.1" 200 -
+2025-05-10 22:36:30,097 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:30,098 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: review
+2025-05-10 22:36:30,251 - INFO - 192.168.4.20 - - [10/May/2025 22:36:30] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:30,917 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:30,917 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: review
+2025-05-10 22:36:31,064 - INFO - 192.168.4.20 - - [10/May/2025 22:36:31] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:31,549 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:31,549 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: review
+2025-05-10 22:36:31,697 - INFO - 192.168.4.20 - - [10/May/2025 22:36:31] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:32,476 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:32,476 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: mastered
+2025-05-10 22:36:32,642 - INFO - 192.168.4.20 - - [10/May/2025 22:36:32] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:33,914 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:33,915 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: mastered
+2025-05-10 22:36:34,056 - INFO - 192.168.4.20 - - [10/May/2025 22:36:34] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:34,466 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:34,467 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: review
+2025-05-10 22:36:34,630 - INFO - 192.168.4.20 - - [10/May/2025 22:36:34] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:35,110 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:35,110 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: review
+2025-05-10 22:36:35,261 - INFO - 192.168.4.20 - - [10/May/2025 22:36:35] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:41,354 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948
+2025-05-10 22:36:41,357 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 7564bc02-a502-432d-8ad6-f1d39a4ba948, status: mastered
+2025-05-10 22:36:41,526 - INFO - 192.168.4.20 - - [10/May/2025 22:36:41] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:45,361 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d
+2025-05-10 22:36:45,361 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d, status: review
+2025-05-10 22:36:45,528 - INFO - 192.168.4.20 - - [10/May/2025 22:36:45] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:46,387 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d
+2025-05-10 22:36:46,388 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d, status: review
+2025-05-10 22:36:46,537 - INFO - 192.168.4.20 - - [10/May/2025 22:36:46] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:46,999 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d
+2025-05-10 22:36:46,999 - INFO - Updating flashcard status for user_id: user123, flashcard_id: 0f28e7a7-a3ab-4e8a-be3d-5e656252e54d, status: mastered
+2025-05-10 22:36:47,165 - INFO - 192.168.4.20 - - [10/May/2025 22:36:47] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:36:57,693 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d77ce432-ca27-4289-9622-beab8140b3da
+2025-05-10 22:36:57,695 - INFO - Updating flashcard status for user_id: user123, flashcard_id: d77ce432-ca27-4289-9622-beab8140b3da, status: mastered
+2025-05-10 22:36:57,860 - INFO - 192.168.4.20 - - [10/May/2025 22:36:57] "POST /update_flashcard_status HTTP/1.1" 200 -
+2025-05-10 22:52:04,299 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/image_answer.py', reloading
+2025-05-11 13:38:12,728 - INFO - Starting Flask application
+2025-05-11 13:38:18,132 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-11 13:38:18,132 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-11 13:38:18,133 - INFO -  * Restarting with stat
+2025-05-11 13:38:41,102 - INFO - Starting Flask application
+2025-05-11 13:38:41,232 - WARNING -  * Debugger is active!
+2025-05-11 13:38:41,288 - INFO -  * Debugger PIN: 461-607-501
+2025-05-11 13:40:43,073 - ERROR - Error in generate_image_answer: process_image_with_gemini() got an unexpected keyword argument 'image_base64'
+2025-05-11 13:40:43,078 - INFO - 192.168.4.20 - - [11/May/2025 13:40:43] "[35m[1mPOST /generate_image_answer HTTP/1.1[0m" 500 -
+2025-05-12 20:08:09,919 - INFO - Starting Flask application
+2025-05-12 20:08:15,319 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-12 20:08:15,324 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-12 20:08:15,324 - INFO -  * Restarting with stat
+2025-05-12 20:08:31,297 - INFO - Starting Flask application
+2025-05-12 20:08:31,368 - WARNING -  * Debugger is active!
+2025-05-12 20:08:31,421 - INFO -  * Debugger PIN: 461-607-501
+2025-05-12 20:12:18,340 - INFO - Processing chat for user_id: user123, input: hey 
+2025-05-12 20:12:20,905 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:12:21,647 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:12:21,675 - INFO - AFC remote call 1 is done.
+2025-05-12 20:12:21,960 - INFO - 192.168.4.20 - - [12/May/2025 20:12:21] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:12:40,787 - INFO - Processing chat for user_id: user123, input: well I was wondering if u could create an image of a futuristic bedroom 
+2025-05-12 20:12:41,404 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:12:42,119 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:12:42,136 - INFO - AFC remote call 1 is done.
+2025-05-12 20:12:42,137 - INFO - Generating image for prompt: futuristic bedroom with neon lighting, holographic displays, and sleek minimalist furniture
+2025-05-12 20:16:04,859 - INFO - 192.168.4.20 - - [12/May/2025 20:16:04] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:17:25,180 - INFO - Processing image for user_id: user123
+2025-05-12 20:17:26,316 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:17:29,522 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:17:29,546 - INFO - AFC remote call 1 is done.
+2025-05-12 20:17:29,821 - INFO - 192.168.4.20 - - [12/May/2025 20:17:29] "POST /process_image HTTP/1.1" 200 -
+2025-05-12 20:17:51,363 - INFO - Processing chat for user_id: user123, input: well u haven't created the image yet
+2025-05-12 20:17:52,023 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:17:52,944 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:17:52,951 - INFO - AFC remote call 1 is done.
+2025-05-12 20:17:52,951 - INFO - Generating image for prompt: futuristic minimalist bedroom with a panoramic city view at night
+2025-05-12 20:19:54,355 - INFO - Processing chat for user_id: user123, input: create an image of a futuristic city 
+2025-05-12 20:19:55,136 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:19:56,241 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:19:56,267 - INFO - AFC remote call 1 is done.
+2025-05-12 20:19:56,268 - INFO - Generating image for prompt: sprawling futuristic city with flying vehicles and neon lights
+2025-05-12 20:20:07,871 - INFO - 192.168.4.20 - - [12/May/2025 20:20:07] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:20:26,559 - INFO - Processing chat for user_id: user123, input: create an image of a futuristic city 
+2025-05-12 20:20:27,028 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:20:27,820 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:20:27,822 - INFO - AFC remote call 1 is done.
+2025-05-12 20:20:27,822 - INFO - Generating image for prompt: futuristic city with flying vehicles and towering skyscrapers
+2025-05-12 20:22:15,818 - INFO - 192.168.4.20 - - [12/May/2025 20:22:15] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:22:57,734 - INFO - 192.168.4.20 - - [12/May/2025 20:22:57] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:26:47,261 - INFO - Processing chat for user_id: user123, input: hey 
+2025-05-12 20:26:48,707 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:26:49,691 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:26:49,730 - INFO - AFC remote call 1 is done.
+2025-05-12 20:26:50,002 - INFO - 192.168.4.20 - - [12/May/2025 20:26:50] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:27:37,844 - INFO - Processing chat for user_id: user123, input: well I was wondering if u could create an image for a futuristic bedroom 
+2025-05-12 20:27:38,611 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:27:39,386 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:27:39,391 - INFO - AFC remote call 1 is done.
+2025-05-12 20:27:39,392 - INFO - Generating image for prompt: futuristic bedroom with minimalist design and a city view at night
+2025-05-12 20:27:51,258 - INFO - 192.168.4.20 - - [12/May/2025 20:27:51] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:32:14,787 - INFO - Processing chat for user_id: user123, input: yooo
+2025-05-12 20:32:16,140 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:32:17,046 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:32:17,064 - INFO - AFC remote call 1 is done.
+2025-05-12 20:32:17,359 - INFO - 192.168.4.20 - - [12/May/2025 20:32:17] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:34:19,739 - INFO - Processing chat for user_id: user123, input: could u create another image pls
+2025-05-12 20:34:20,369 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:34:21,446 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:34:21,456 - INFO - AFC remote call 1 is done.
+2025-05-12 20:34:21,457 - INFO - Generating image for prompt: Futuristic bedroom with holographic Koi pond and zero-gravity bed
+2025-05-12 20:34:32,940 - INFO - 192.168.4.20 - - [12/May/2025 20:34:32] "POST /chat HTTP/1.1" 200 -
+2025-05-12 20:35:23,019 - INFO - Processing chat for user_id: user123, input: now of a futuristic city 
+2025-05-12 20:35:23,686 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 20:35:24,932 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 20:35:24,950 - INFO - AFC remote call 1 is done.
+2025-05-12 20:35:24,951 - INFO - Generating image for prompt: futuristic city skyline with flying cars and neon-lit skyscrapers
+2025-05-12 20:37:12,453 - INFO - 192.168.4.20 - - [12/May/2025 20:37:12] "POST /chat HTTP/1.1" 200 -
+2025-05-12 21:13:51,311 - INFO - Processing chat for user_id: user123, input: hey 
+2025-05-12 21:13:53,405 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 21:13:54,557 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 21:13:54,590 - INFO - AFC remote call 1 is done.
+2025-05-12 21:13:54,590 - INFO - Generating image for prompt: futuristic city skyline with flying cars and neon-lit skyscrapers
+2025-05-12 21:14:23,076 - INFO - Clearing chat history for user_id: user123
+2025-05-12 21:14:23,472 - INFO - 192.168.4.20 - - [12/May/2025 21:14:23] "POST /clear_chat HTTP/1.1" 200 -
+2025-05-12 21:16:30,569 - INFO - Starting Flask application
+2025-05-12 21:16:35,801 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-12 21:16:35,801 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-12 21:16:35,801 - INFO -  * Restarting with stat
+2025-05-12 21:16:48,884 - INFO - Starting Flask application
+2025-05-12 21:16:48,945 - WARNING -  * Debugger is active!
+2025-05-12 21:16:48,987 - INFO -  * Debugger PIN: 461-607-501
+2025-05-12 21:26:54,597 - INFO - Processing image for user_id: user123
+2025-05-12 21:26:57,253 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 21:27:03,488 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 21:27:03,509 - INFO - AFC remote call 1 is done.
+2025-05-12 21:27:03,792 - INFO - 192.168.4.20 - - [12/May/2025 21:27:03] "POST /process_image HTTP/1.1" 200 -
+2025-05-12 21:27:46,826 - INFO - Processing chat for user_id: user123, input: lol just updating y
+2025-05-12 21:27:47,272 - ERROR - Chat error for user_id: user123: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 112, in chat
+    response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py", line 474, in generate_gemini_response
+    - If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+TypeError: 'NoneType' object is not subscriptable
+2025-05-12 21:27:47,310 - INFO - 192.168.4.20 - - [12/May/2025 21:27:47] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-12 21:28:17,101 - INFO - Processing chat for user_id: user123, input: u good bruh
+2025-05-12 21:28:17,447 - ERROR - Chat error for user_id: user123: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 112, in chat
+    response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py", line 474, in generate_gemini_response
+    - If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+TypeError: 'NoneType' object is not subscriptable
+2025-05-12 21:28:17,449 - INFO - 192.168.4.20 - - [12/May/2025 21:28:17] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-12 21:29:39,006 - INFO - Starting Flask application
+2025-05-12 21:29:44,117 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-12 21:29:44,122 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-12 21:29:44,123 - INFO -  * Restarting with stat
+2025-05-12 21:29:55,471 - INFO - Starting Flask application
+2025-05-12 21:29:55,513 - WARNING -  * Debugger is active!
+2025-05-12 21:29:55,562 - INFO -  * Debugger PIN: 461-607-501
+2025-05-12 21:30:03,479 - INFO - Processing chat for user_id: user123, input: yo you good bruh
+2025-05-12 21:30:04,916 - ERROR - Chat error for user_id: user123: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 112, in chat
+    response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py", line 474, in generate_gemini_response
+    - If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+TypeError: 'NoneType' object is not subscriptable
+2025-05-12 21:30:04,939 - INFO - 192.168.4.20 - - [12/May/2025 21:30:04] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-12 21:41:56,647 - INFO - Processing chat for user_id: user123, input: hey 
+2025-05-12 21:41:57,435 - ERROR - Chat error for user_id: user123: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 112, in chat
+    response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py", line 474, in generate_gemini_response
+    - If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+TypeError: 'NoneType' object is not subscriptable
+2025-05-12 21:41:57,455 - INFO - 192.168.4.20 - - [12/May/2025 21:41:57] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-12 21:43:21,059 - INFO - Starting Flask application
+2025-05-12 21:43:26,204 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-12 21:43:26,204 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-12 21:43:26,205 - INFO -  * Restarting with stat
+2025-05-12 21:43:38,311 - INFO - Starting Flask application
+2025-05-12 21:43:38,387 - WARNING -  * Debugger is active!
+2025-05-12 21:43:38,441 - INFO -  * Debugger PIN: 461-607-501
+2025-05-12 21:44:08,424 - INFO - Processing image for user_id: user123
+2025-05-12 21:44:09,790 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-12 21:44:14,734 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-12 21:44:14,772 - INFO - AFC remote call 1 is done.
+2025-05-12 21:44:15,011 - INFO - 192.168.4.20 - - [12/May/2025 21:44:15] "POST /process_image HTTP/1.1" 200 -
+2025-05-12 21:44:34,042 - INFO - Processing chat for user_id: user123, input: hey what's up
+2025-05-12 21:44:34,376 - ERROR - Chat error for user_id: user123: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 112, in chat
+    response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py", line 474, in generate_gemini_response
+    - If the user asks for the weather (e.g., "what's the weather?" or "weather in London"), provide a creative, engaging response using the weather data (e.g., "London's got {weather_info['description'].lower()} at {weather_info['temperature']}°C—grab a scarf and keep studying! 🧣"). Include feels-like and humidity if relevant, and avoid robotic phrasing.
+TypeError: 'NoneType' object is not subscriptable
+2025-05-12 21:44:34,395 - INFO - 192.168.4.20 - - [12/May/2025 21:44:34] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-12 21:53:45,327 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py', reloading
+2025-05-12 21:53:50,855 - INFO -  * Restarting with stat

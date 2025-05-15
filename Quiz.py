@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import random
+import logging
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -9,46 +10,84 @@ from firebase_admin import firestore
 from datetime import datetime
 from Max import save_user_memory
 
-# Load environment variables
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('quiz.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
-# Initialize Gemini API
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# --- Core Quiz Functions ---
-
 MAX_RETRIES = 5
 
-def generate_quiz_question(db, user_id, topic=None, retry_count=0):
-    """
-    Generate a unique multiple-choice quiz question for the given user and topic.
-    Prioritizes study_topic from memories, then study_goal, then defaults to 'programming and coding'.
-    If topic is 'General', selects a random topic from a predefined list.
-    Saves topic as study_topic memory if provided.
-    """
+def get_incorrect_questions(db, user_id, topic=None):
     try:
-        # Fetch user data
-        user_data = db.collection('users').document(user_id).get().to_dict()
+        user_ref = db.collection('users').document(user_id)
+        user_data = user_ref.get().to_dict()
         if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return []
+
+        quiz_history = user_data.get('quiz_history', [])
+        quiz_responses = user_data.get('quiz_responses', {})
+        incorrect_questions = []
+
+        for question in quiz_history:
+            if topic and question.get('topic') != topic:
+                continue
+            question_id = question.get('question_id')
+            if question_id in quiz_responses:
+                response = quiz_responses[question_id]
+                latest_attempt = response.get('attempts', [])[-1] if response.get('attempts') else response
+                if not latest_attempt.get('is_correct'):
+                    incorrect_questions.append(question)
+
+        logger.debug(f"Found {len(incorrect_questions)} incorrect questions for user_id: {user_id}, topic: {topic}")
+        return incorrect_questions
+    except Exception as e:
+        logger.exception(f"Error fetching incorrect questions for user_id: {user_id}: {e}")
+        return []
+
+def generate_quiz_question(db, user_id, topic=None, year_group=None, multiplayer=False, retry_count=0):
+    try:
+        logger.info(f"Generating quiz question for user_id: {user_id}, topic: {topic}, year_group: {year_group}, multiplayer: {multiplayer}")
+        user_data = db.collection('users').document(user_id).get().to_dict() if db else {}
+        if not user_data and not multiplayer:
+            logger.warning(f"User not found: {user_id}")
             return {"error": "User not found"}
 
-        quiz_history = get_quiz_history(db, user_id)
-        memories = user_data.get('memories', [])
-        
-        # Define possible topics for General quizzes
+        quiz_history = get_quiz_history(db, user_id) if db else []
+        memories = user_data.get('memories', []) if user_data else []
+
+        if not multiplayer and db:
+            incorrect_questions = get_incorrect_questions(db, user_id, topic)
+            if incorrect_questions:
+                question = random.choice(incorrect_questions)
+                logger.info(f"Repeating incorrect question for user_id: {user_id}, question_id: {question['question_id']}")
+                return {
+                    "question_id": question['question_id'],
+                    "question": question['question'],
+                    "answers": question['answers'],
+                    "correct_answer": question['correct_answer'],
+                    "explanation": question.get('explanation', 'No explanation available.'),
+                    "topic": question['topic']
+                }
+
+        logger.info(f"Generating new question for user_id: {user_id}")
+
         general_topics = [
-            'Python',
-            'JavaScript',
-            'Algorithms',
-            'Data Structures',
-            'Databases',
-            'Mathematics',
-            'Physics',
-            'History'
+            'Python', 'JavaScript', 'Algorithms', 'Data Structures', 'Databases',
+            'Mathematics', 'Physics', 'Chemistry', 'Biology', 'History',
+            'Literature', 'English Grammar', 'Geography', 'Economics', 'Computer Science'
         ]
 
-        # Determine topic
         effective_topic = topic
         if effective_topic == 'General':
             effective_topic = random.choice(general_topics)
@@ -60,26 +99,27 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
         if not effective_topic:
             effective_topic = get_study_goal(db, user_id) or 'programming and coding'
 
-        # Save topic as study_topic memory if provided (but not for General to avoid overwriting)
-        if topic and topic != 'General':
+        if topic and topic != 'General' and not multiplayer and db:
             save_user_memory(user_id, {
                 "type": "study_topic",
                 "value": topic,
                 "timestamp": datetime.now().isoformat()
             })
 
-        # Format quiz history for prompt
         history_str = ""
         for i, question in enumerate(quiz_history):
             history_str += f"Question {i+1}: {question['question']} | Answers: {', '.join(question['answers'])} | Correct Answer: {question['correct_answer']}\n"
 
+        year_group_prompt = f" suitable for {year_group} students" if year_group and year_group != 'General' else ""
         prompt = f"""
-        Generate a brand new random quiz question about {effective_topic}.
-        Only one answer should be correct. Return strictly in this JSON format:
+        Generate a brand new random quiz question about {effective_topic}{year_group_prompt}.
+        Only one answer should be correct. Provide a concise step-by-step explanation (2-3 short steps, max 50-60 words) for the correct answer.
+        Return strictly in this JSON format:
         {{
           "question": "What is the capital of Australia?",
           "answers": ["Sydney", "Melbourne", "Canberra", "Perth"],
-          "correct_answer": "Canberra"
+          "correct_answer": "Canberra",
+          "explanation": "Canberra is the capital. Step 1: Sydney and Melbourne are major cities but not capitals. Step 2: Canberra was chosen as a neutral capital."
         }}
         Do not repeat previous questions. Here is the previous quiz history:
         {history_str}
@@ -100,7 +140,6 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
                 if hasattr(part, "text") and part.text:
                     text += part.text
 
-            # Extract JSON
             start_idx = text.find("```json")
             end_idx = text.find("```", start_idx + 7) if start_idx != -1 else -1
             if start_idx != -1 and end_idx != -1:
@@ -113,70 +152,111 @@ def generate_quiz_question(db, user_id, topic=None, retry_count=0):
             try:
                 question_data = json.loads(json_text)
 
-                # Validate response format
-                if not all(key in question_data for key in ['question', 'answers', 'correct_answer']):
+                if not all(key in question_data for key in ['question', 'answers', 'correct_answer', 'explanation']):
+                    logger.error("Invalid quiz question format")
                     return {"error": "Invalid quiz question format"}
                 if len(question_data['answers']) != 4 or question_data['correct_answer'] not in question_data['answers']:
+                    logger.error("Invalid answers or correct_answer")
                     return {"error": "Invalid answers or correct_answer"}
 
-                # Check for duplicates
                 for question in quiz_history:
                     if question['question'] == question_data['question']:
-                        print(f"[Duplicate Question] {question_data['question']}")
+                        logger.warning(f"Duplicate question detected: {question_data['question']}")
                         if retry_count < MAX_RETRIES:
-                            return generate_quiz_question(db, user_id, topic, retry_count + 1)
+                            return generate_quiz_question(db, user_id, topic, year_group, multiplayer, retry_count + 1)
+                        logger.error("Unable to generate unique quiz question after max retries")
                         return {"error": "Unable to generate unique quiz question after max retries"}
 
-                # Generate and add question ID
                 question_id = str(uuid.uuid4())
                 question_data['question_id'] = question_id
 
-                # Save to quiz_history
-                history_entry = {
-                    "question_id": question_id,
-                    "question": question_data['question'],
-                    "answers": question_data['answers'],
-                    "correct_answer": question_data['correct_answer'],
-                    "topic": effective_topic,
-                    "timestamp": datetime.now().isoformat()
-                }
-                db.collection('users').document(user_id).update({
-                    "quiz_history": firestore.ArrayUnion([history_entry])
-                })
-                print(f"[Quiz] Saved to quiz_history: {history_entry}")
+                if not multiplayer and db:
+                    history_entry = {
+                        "question_id": question_id,
+                        "question": question_data['question'],
+                        "answers": question_data['answers'],
+                        "correct_answer": question_data['correct_answer'],
+                        "explanation": question_data['explanation'],
+                        "topic": effective_topic,
+                        "year_group": year_group or 'General',
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    db.collection('users').document(user_id).update({
+                        "quiz_history": firestore.ArrayUnion([history_entry])
+                    })
+                    logger.info(f"Saved to quiz_history for user_id: {user_id}: {history_entry}")
 
                 return {
                     "question_id": question_id,
                     "question": question_data['question'],
                     "answers": question_data['answers'],
                     "correct_answer": question_data['correct_answer'],
-                    "topic": effective_topic
+                    "explanation": question_data['explanation'],
+                    "topic": effective_topic,
+                    "year_group": year_group or 'General'
                 }
 
             except json.JSONDecodeError as e:
-                print(f"[JSON Decode Error] {e}")
+                logger.exception(f"JSON decode error: {e}")
                 return {"error": "Invalid JSON format in response"}
         else:
-            print("[Quiz Generation Error] Empty or invalid response")
+            logger.error("Empty or invalid response from Gemini API")
             return {"error": "Unable to generate quiz question"}
 
     except Exception as e:
-        print(f"[Quiz Generation Error] {e}")
+        logger.exception(f"Quiz generation error for user_id: {user_id}: {e}")
         return {"error": "Unable to generate quiz question"}
 
-def save_quiz_response(db, user_id, question_id, user_answer, is_correct):
+def save_quiz_response(db, user_id, question_id, user_answer, is_correct, question_data, multiplayer=False, game_code=None, score=0, response_time=None):
     try:
         user_ref = db.collection('users').document(user_id)
-        user_ref.update({
-            f"quiz_responses.{question_id}": {
-                "answer": user_answer,
-                "is_correct": is_correct,
-                "timestamp": firestore.SERVER_TIMESTAMP
-            }
-        })
-        print(f"[Quiz] Saved to quiz_responses: {{question_id: {question_id}, answer: {user_answer}, is_correct: {is_correct}}}")
+        response_data = {
+            "question_id": question_id,
+            "question": question_data['question'],
+            "user_answer": user_answer,
+            "correct_answer": question_data['correct_answer'],
+            "is_correct": is_correct,
+            "explanation": question_data.get('explanation', 'No explanation available.'),
+            "topic": question_data['topic'],
+            "year_group": question_data.get('year_group', 'General'),
+            "timestamp": firestore.SERVER_TIMESTAMP
+        }
+        if multiplayer and game_code:
+            response_data.update({
+                "score": score,
+                "response_time": response_time,
+                "game_code": game_code
+            })
+            user_ref.update({
+                f"multiplayer_responses.{game_code}.{question_id}": response_data
+            })
+            logger.info(f"Saved multiplayer response for user_id: {user_id}, game_code: {game_code}, question_id: {question_id}, score: {score}")
+        else:
+            user_ref.update({
+                f"quiz_responses.{question_id}": response_data
+            })
+            logger.info(f"Saved single-player response for user_id: {user_id}, question_id: {question_id}, answer: {user_answer}, is_correct: {is_correct}")
     except Exception as e:
-        print(f"[Firestore Error] {e}")
+        logger.exception(f"Firestore error saving quiz response for user_id: {user_id}, question_id: {question_id}: {e}")
+
+def save_multiplayer_score(db, user_id, game_code, score, total_questions, topic, year_group):
+    try:
+        user_ref = db.collection('users').document(user_id)
+        quiz_score_entry = {
+            'score': score,
+            'total_questions': total_questions,
+            'topic': topic,
+            'year_group': year_group,
+            'game_code': game_code,
+            'timestamp': datetime.utcnow().isoformat(),
+            'mode': 'multiplayer'
+        }
+        user_ref.update({
+            'quiz_scores': firestore.ArrayUnion([quiz_score_entry])
+        })
+        logger.info(f"Saved multiplayer score for user_id: {user_id}, game_code: {game_code}, score: {score}/{total_questions}")
+    except Exception as e:
+        logger.exception(f"Error saving multiplayer score for user_id: {user_id}: {e}")
 
 def save_quiz_to_history(db, user_id, question_data):
     try:
@@ -184,32 +264,42 @@ def save_quiz_to_history(db, user_id, question_data):
         user_ref.update({
             "quiz_history": firestore.ArrayUnion([question_data])
         })
+        logger.debug(f"Saved quiz to history for user_id: {user_id}: {question_data}")
     except Exception as e:
-        print(f"[Firestore Quiz History Error] {e}")
+        logger.exception(f"Firestore quiz history error for user_id: {user_id}: {e}")
 
-def get_quiz_history(db, user_id):
+def get_quiz_history(db, user_id, topic=None, year_group=None):
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
-        return user_doc.to_dict().get('quiz_history', []) if user_doc.exists else []
+        quiz_history = user_doc.to_dict().get('quiz_history', []) if user_doc.exists else []
+        if topic:
+            quiz_history = [q for q in quiz_history if q.get('topic') == topic]
+        if year_group:
+            quiz_history = [q for q in quiz_history if q.get('year_group') == year_group]
+        logger.debug(f"Fetched quiz history for user_id: {user_id}, topic: {topic}, year_group: {year_group}, count: {len(quiz_history)}")
+        return quiz_history
     except Exception as e:
-        print(f"[Firestore Error] {e}")
+        logger.exception(f"Firestore error fetching quiz history for user_id: {user_id}: {e}")
         return []
 
 def get_study_goal(db, user_id):
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
-        return user_doc.to_dict().get('study_goal', None) if user_doc.exists else None
+        study_goal = user_doc.to_dict().get('study_goal', None) if user_doc.exists else None
+        logger.debug(f"Fetched study goal for user_id: {user_id}: {study_goal}")
+        return study_goal
     except Exception as e:
-        print(f"[Firestore Error] {e}")
+        logger.exception(f"Firestore error fetching study goal for user_id: {user_id}: {e}")
         return None
 
-def check_answer(db, user_id, question_id, user_answer):
+def check_answer(db, user_id, question_id, user_answer, multiplayer=False, game_code=None, response_time=None):
     try:
         user_ref = db.collection('users').document(user_id)
         user_data = user_ref.get().to_dict()
         if not user_data:
+            logger.warning(f"User not found: {user_id}")
             return {"error": "User not found"}
 
         quiz_history = get_quiz_history(db, user_id)
@@ -217,14 +307,23 @@ def check_answer(db, user_id, question_id, user_answer):
             if question.get('question_id') == question_id:
                 correct_answer = question.get('correct_answer')
                 is_correct = user_answer == correct_answer
-                save_quiz_response(db, user_id, question_id, user_answer, is_correct)
+                score = 0
+                if multiplayer and is_correct:
+                    max_time = 15
+                    score = 100
+                    if response_time and response_time < max_time:
+                        score += int((1 - response_time / max_time) * 50)
+                save_quiz_response(db, user_id, question_id, user_answer, is_correct, question, multiplayer, game_code, score, response_time)
+                logger.info(f"Checked answer for user_id: {user_id}, question_id: {question_id}, is_correct: {is_correct}, score: {score if multiplayer else 0}")
                 return {
                     "result": "correct" if is_correct else "incorrect",
-                    "correct_answer": correct_answer
+                    "correct_answer": correct_answer,
+                    "score": score if multiplayer else 0
                 }
 
+        logger.error(f"Question not found for user_id: {user_id}, question_id: {question_id}")
         return {"error": "Question not found"}
 
     except Exception as e:
-        print(f"[Check Answer Error] {e}")
+        logger.exception(f"Check answer error for user_id: {user_id}, question_id: {question_id}: {e}")
         return {"error": "Failed to check answer"}
