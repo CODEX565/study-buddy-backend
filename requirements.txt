@@ -3,7 +3,7 @@ firebase_admin==6.7.0
 Flask==3.1.1
 Flask_SocketIO==5.5.1
 Pillow==11.2.1
-protobuf==6.31.0
+protobuf==4.25.3
 PyPDF2==3.0.1
 python-dotenv==1.1.0
 python_docx==1.1.2
