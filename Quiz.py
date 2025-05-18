@@ -353,6 +353,30 @@ def get_study_goal(db, user_id):
         logger.exception(f"Firestore error fetching study goal for user_id: {user_id}: {e}")
         return None
 
+def start_quiz_attempt(db, user_id, quiz_id):
+    """Start a quiz attempt and return the questions for the user to answer."""
+    try:
+        quiz_ref = db.collection('quizzes').document(quiz_id)
+        quiz_doc = quiz_ref.get()
+        if not quiz_doc.exists:
+            logger.warning(f"Quiz not found: {quiz_id}")
+            return {"error": "Quiz not found"}
+        
+        quiz_data = quiz_doc.to_dict()
+        questions = quiz_data.get('questions', [])
+        if not questions:
+            logger.error(f"No questions found in quiz: {quiz_id}")
+            return {"error": "No questions available"}
+        
+        return {
+            "quiz_id": quiz_id,
+            "questions": questions,
+            "status": "in_progress"
+        }
+    except Exception as e:
+        logger.exception(f"Error starting quiz attempt for user_id: {user_id}, quiz_id: {quiz_id}: {e}")
+        return {"error": str(e)}
+
 def check_answer(db, user_id, question_id, user_answer, multiplayer=False, game_code=None, response_time=None):
     """Check if the user's answer is correct and save the response."""
     try:
@@ -562,12 +586,17 @@ def evaluate_exam(db, user_id, exam_id):
         exam_ref.update(exam_data)
 
         if passed:
+            feedback = {
+                "message": f"Congratulations! You passed the exam with a score of {score*100:.0f}%. Great job!",
+                "date": datetime.utcnow().isoformat()
+            }
             logger.info(f"Exam passed for user_id: {user_id}, exam_id: {exam_id}")
             return {
                 "result": "pass",
                 "score": score,
                 "next_step": "success",
-                "results": results
+                "results": results,
+                "feedback": feedback
             }
         else:
             summary = generate_summary(db, user_id, exam_id, is_exam=True)
@@ -681,7 +710,7 @@ def generate_total_summary(db, user_id):
             quiz_summary = {
                 'quiz_id': quiz.id,
                 'topic': quiz_data.get('topic', 'General'),
-                'correct': quiz_data.get('correct', 0),
+                'correct': sum(1 for r in quiz_data.get('results', []) if r.get('is_correct', False)),
                 'total': quiz_data.get('total_questions', 1),
                 'score': quiz_data.get('score', 0.0),
                 'incorrect_questions': []
@@ -715,7 +744,7 @@ def generate_total_summary(db, user_id):
             exam_summary = {
                 'exam_id': exam.id,
                 'topic': exam_data.get('topic', 'General'),
-                'correct': exam_data.get('correct', 0),
+                'correct': sum(1 for r in exam_data.get('results', []) if r.get('is_correct', False)),
                 'total': exam_data.get('total_questions', 1),
                 'score': exam_data.get('score', 0.0),
                 'incorrect_questions': []
