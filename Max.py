@@ -3,7 +3,7 @@ import re
 import requests
 import base64
 from dotenv import load_dotenv
-import google.generativeai as genai
+import google.genai as genai
 from google.genai import types
 import firebase_admin
 from firebase_admin import credentials, firestore
