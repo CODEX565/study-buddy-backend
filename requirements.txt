@@ -12,6 +12,6 @@ requests
 timezonefinder
 Werkzeug
 gunicorn
-google-generativeai-0.8.5
+google-generativeai
 
 
