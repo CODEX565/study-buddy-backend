@@ -13,5 +13,5 @@ timezonefinder
 Werkzeug
 gunicorn
 google-generativeai
-
+google-generativeai
 
