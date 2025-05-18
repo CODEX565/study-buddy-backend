@@ -26,6 +26,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 MAX_RETRIES = 5
+PASS_THRESHOLD = 0.7  # 70% correct to pass quiz or exam
 
 def map_age_to_year_group(age):
     """Map age to an approximate year group."""
@@ -70,6 +71,7 @@ def get_user_data(db, user_id):
         return {"error": "Failed to fetch user data"}
 
 def get_incorrect_questions(db, user_id, topic=None):
+    """Fetch incorrect questions for a user, optionally filtered by topic."""
     try:
         user_ref = db.collection('users').document(user_id)
         user_data = user_ref.get().to_dict()
@@ -98,6 +100,7 @@ def get_incorrect_questions(db, user_id, topic=None):
         return []
 
 def generate_quiz_question(db, user_id, topic=None, age=None, year_group=None, multiplayer=False, retry_count=0):
+    """Generate a single quiz question, reusing incorrect questions if available."""
     try:
         logger.info(f"Generating quiz question for user_id: {user_id}, topic: {topic}, age: {age}, year_group: {year_group}, multiplayer: {multiplayer}")
         user_data = db.collection('users').document(user_id).get().to_dict() if db else {}
@@ -149,7 +152,6 @@ def generate_quiz_question(db, user_id, topic=None, age=None, year_group=None, m
                 "timestamp": datetime.now().isoformat()
             })
 
-        # Determine effective year group
         effective_year_group = year_group or user_data.get('year_group', None)
         if not effective_year_group and age:
             effective_year_group = map_age_to_year_group(age)
@@ -258,6 +260,7 @@ def generate_quiz_question(db, user_id, topic=None, age=None, year_group=None, m
         return {"error": "Unable to generate quiz question"}
 
 def save_quiz_response(db, user_id, question_id, user_answer, is_correct, question_data, multiplayer=False, game_code=None, score=0, response_time=None):
+    """Save user's quiz response to Firestore."""
     try:
         user_ref = db.collection('users').document(user_id)
         response_data = {
@@ -290,6 +293,7 @@ def save_quiz_response(db, user_id, question_id, user_answer, is_correct, questi
         logger.exception(f"Firestore error saving quiz response for user_id: {user_id}, question_id: {question_id}: {e}")
 
 def save_quiz_score(db, user_id, score, total_questions, topic, year_group, results, multiplayer=False, game_code=None):
+    """Save quiz score and results to Firestore."""
     try:
         user_ref = db.collection('users').document(user_id)
         quiz_score_entry = {
@@ -311,6 +315,7 @@ def save_quiz_score(db, user_id, score, total_questions, topic, year_group, resu
         logger.exception(f"Error saving quiz score for user_id: {user_id}: {e}")
 
 def save_quiz_to_history(db, user_id, question_data):
+    """Save quiz question to user's history."""
     try:
         user_ref = db.collection('users').document(user_id)
         user_ref.update({
@@ -321,6 +326,7 @@ def save_quiz_to_history(db, user_id, question_data):
         logger.exception(f"Firestore quiz history error for user_id: {user_id}: {e}")
 
 def get_quiz_history(db, user_id, topic=None, year_group=None):
+    """Fetch quiz history, optionally filtered by topic or year group."""
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
@@ -336,6 +342,7 @@ def get_quiz_history(db, user_id, topic=None, year_group=None):
         return []
 
 def get_study_goal(db, user_id):
+    """Fetch user's study goal."""
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
@@ -347,6 +354,7 @@ def get_study_goal(db, user_id):
         return None
 
 def check_answer(db, user_id, question_id, user_answer, multiplayer=False, game_code=None, response_time=None):
+    """Check if the user's answer is correct and save the response."""
     try:
         user_ref = db.collection('users').document(user_id)
         user_data = user_ref.get().to_dict()
@@ -379,3 +387,366 @@ def check_answer(db, user_id, question_id, user_answer, multiplayer=False, game_
     except Exception as e:
         logger.exception(f"Check answer error for user_id: {user_id}, question_id: {question_id}: {e}")
         return {"error": "Failed to check answer"}
+
+def generate_full_quiz(db, user_id, topic=None, question_count=5, age=None, year_group=None, group=None):
+    """Generate a full quiz with multiple questions."""
+    try:
+        logger.info(f"Generating full quiz for user_id: {user_id}, topic: {topic}, question_count: {question_count}")
+        quiz_id = str(uuid.uuid4())
+        questions = []
+        for _ in range(question_count):
+            question_data = generate_quiz_question(db, user_id, topic, age, year_group)
+            if "error" in question_data:
+                logger.error(f"Failed to generate question: {question_data['error']}")
+                continue
+            question_data['user_id'] = user_id
+            question_data['timestamp'] = firestore.SERVER_TIMESTAMP
+            questions.append(question_data)
+            db.collection('quizzes').document(question_data['question_id']).set(question_data)
+
+        quiz_data = {
+            "quiz_id": quiz_id,
+            "user_id": user_id,
+            "topic": topic or "General",
+            "year_group": year_group or "General",
+            "group": group,
+            "questions": questions,
+            "status": "pending",
+            "timestamp": firestore.SERVER_TIMESTAMP
+        }
+        db.collection('quizzes').document(quiz_id).set(quiz_data)
+        logger.debug(f"Generated full quiz for user_id: {user_id}: {quiz_data}")
+        return quiz_data
+    except Exception as e:
+        logger.exception(f"Error generating full quiz for user_id: {user_id}: {e}")
+        return {"error": str(e)}
+
+def evaluate_quiz(db, user_id, quiz_id):
+    """Evaluate quiz results and determine next steps."""
+    try:
+        quiz_ref = db.collection('quizzes').document(quiz_id)
+        quiz_doc = quiz_ref.get()
+        if not quiz_doc.exists:
+            logger.warning(f"Quiz not found: {quiz_id}")
+            return {"error": "Quiz not found"}
+
+        quiz_data = quiz_doc.to_dict()
+        questions = quiz_data.get('questions', [])
+        quiz_responses = db.collection('users').document(user_id).get().to_dict().get('quiz_responses', {})
+
+        correct_count = 0
+        results = []
+        for question in questions:
+            question_id = question['question_id']
+            response = quiz_responses.get(question_id, {})
+            is_correct = response.get('is_correct', False)
+            if is_correct:
+                correct_count += 1
+            results.append({
+                "question_id": question_id,
+                "question": question['question'],
+                "user_answer": response.get('user_answer'),
+                "correct_answer": question['correct_answer'],
+                "is_correct": is_correct,
+                "explanation": question.get('explanation', 'No explanation available.')
+            })
+
+        score = correct_count / len(questions) if questions else 0
+        passed = score >= PASS_THRESHOLD
+
+        quiz_data['status'] = 'completed'
+        quiz_data['score'] = score
+        quiz_data['results'] = results
+        quiz_ref.update(quiz_data)
+
+        save_quiz_score(db, user_id, correct_count, len(questions), quiz_data['topic'], quiz_data['year_group'], results)
+
+        if passed:
+            exam_id = save_to_exam_mode(db, user_id, quiz_id, quiz_data)
+            logger.info(f"Quiz passed for user_id: {user_id}, quiz_id: {quiz_id}, saved to exam mode: {exam_id}")
+            return {
+                "result": "pass",
+                "score": score,
+                "next_step": "exam_mode",
+                "exam_id": exam_id,
+                "results": results
+            }
+        else:
+            summary = generate_summary(db, user_id, quiz_id)
+            logger.info(f"Quiz failed for user_id: {user_id}, quiz_id: {quiz_id}, proceeding to summary")
+            return {
+                "result": "fail",
+                "score": score,
+                "next_step": "summary",
+                "summary": summary,
+                "results": results
+            }
+
+    except Exception as e:
+        logger.exception(f"Error evaluating quiz for user_id: {user_id}, quiz_id: {quiz_id}: {e}")
+        return {"error": str(e)}
+
+def save_to_exam_mode(db, user_id, quiz_id, quiz_data):
+    """Save quiz to exam mode for a full exam-like experience."""
+    try:
+        exam_id = str(uuid.uuid4())
+        exam_data = {
+            "exam_id": exam_id,
+            "user_id": user_id,
+            "quiz_id": quiz_id,
+            "topic": quiz_data['topic'],
+            "year_group": quiz_data['year_group'],
+            "group": quiz_data.get('group'),
+            "questions": quiz_data['questions'],
+            "status": "pending",
+            "timestamp": firestore.SERVER_TIMESTAMP
+        }
+        db.collection('exams').document(exam_id).set(exam_data)
+        logger.debug(f"Saved exam for user_id: {user_id}, exam_id: {exam_id}")
+        return exam_id
+    except Exception as e:
+        logger.exception(f"Error saving to exam mode for user_id: {user_id}: {e}")
+        return None
+
+def generate_exam(db, user_id, exam_id):
+    """Generate exam data for the user."""
+    try:
+        exam_ref = db.collection('exams').document(exam_id)
+        exam_doc = exam_ref.get()
+        if not exam_doc.exists:
+            logger.warning(f"Exam not found: {exam_id}")
+            return {"error": "Exam not found"}
+
+        exam_data = exam_doc.to_dict()
+        return exam_data
+    except Exception as e:
+        logger.exception(f"Error generating exam for user_id: {user_id}, exam_id: {exam_id}: {e}")
+        return {"error": str(e)}
+
+def evaluate_exam(db, user_id, exam_id):
+    """Evaluate exam results and determine next steps."""
+    try:
+        exam_ref = db.collection('exams').document(exam_id)
+        exam_doc = exam_ref.get()
+        if not exam_doc.exists:
+            logger.warning(f"Exam not found: {exam_id}")
+            return {"error": "Exam not found"}
+
+        exam_data = exam_doc.to_dict()
+        questions = exam_data.get('questions', [])
+        quiz_responses = db.collection('users').document(user_id).get().to_dict().get('quiz_responses', {})
+
+        correct_count = 0
+        results = []
+        for question in questions:
+            question_id = question['question_id']
+            response = quiz_responses.get(question_id, {})
+            is_correct = response.get('is_correct', False)
+            if is_correct:
+                correct_count += 1
+            results.append({
+                "question_id": question_id,
+                "question": question['question'],
+                "user_answer": response.get('user_answer'),
+                "correct_answer": question['correct_answer'],
+                "is_correct": is_correct,
+                "explanation": question.get('explanation', 'No explanation available.')
+            })
+
+        score = correct_count / len(questions) if questions else 0
+        passed = score >= PASS_THRESHOLD
+
+        exam_data['status'] = 'completed'
+        exam_data['score'] = score
+        exam_data['results'] = results
+        exam_ref.update(exam_data)
+
+        if passed:
+            logger.info(f"Exam passed for user_id: {user_id}, exam_id: {exam_id}")
+            return {
+                "result": "pass",
+                "score": score,
+                "next_step": "success",
+                "results": results
+            }
+        else:
+            summary = generate_summary(db, user_id, exam_id, is_exam=True)
+            logger.info(f"Exam failed for user_id: {user_id}, exam_id: {exam_id}, proceeding to summary")
+            return {
+                "result": "fail",
+                "score": score,
+                "next_step": "summary",
+                "summary": summary,
+                "results": results
+            }
+
+    except Exception as e:
+        logger.exception(f"Error evaluating exam for user_id: {user_id}, exam_id: {exam_id}: {e}")
+        return {"error": str(e)}
+
+def generate_summary(db, user_id, quiz_or_exam_id, is_exam=False):
+    """Generate a summary of quiz or exam results."""
+    try:
+        collection = 'exams' if is_exam else 'quizzes'
+        doc_ref = db.collection(collection).document(quiz_or_exam_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            logger.warning(f"{'Exam' if is_exam else 'Quiz'} not found: {quiz_or_exam_id}")
+            return {"error": f"{'Exam' if is_exam else 'Quiz'} not found"}
+
+        doc_data = doc.to_dict()
+        results = doc_data.get('results', [])
+        summary = {
+            "score": doc_data.get('score', 0),
+            "total_questions": len(doc_data.get('questions', [])),
+            "correct_count": sum(1 for r in results if r['is_correct']),
+            "incorrect_questions": [
+                {
+                    "question_id": r['question_id'],
+                    "question": r['question'],
+                    "user_answer": r['user_answer'],
+                    "correct_answer": r['correct_answer'],
+                    "explanation": r['explanation']
+                } for r in results if not r['is_correct']
+            ],
+            "next_step": "flashcards"
+        }
+        logger.debug(f"Generated summary for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
+        return summary
+    except Exception as e:
+        logger.exception(f"Error generating summary for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}: {e}")
+        return {"error": str(e)}
+
+def generate_flashcards(db, user_id, quiz_or_exam_id, is_exam=False):
+    """Generate flashcards based on incorrect questions."""
+    try:
+        collection = 'exams' if is_exam else 'quizzes'
+        doc_ref = db.collection(collection).document(quiz_or_exam_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            logger.warning(f"{'Exam' if is_exam else 'Quiz'} not found: {quiz_or_exam_id}")
+            return {"error": f"{'Exam' if is_exam else 'Quiz'} not found"}
+
+        doc_data = doc.to_dict()
+        results = doc_data.get('results', [])
+        flashcards = [
+            {
+                "flashcard_id": str(uuid.uuid4()),
+                "question_id": r['question_id'],
+                "front": r['question'],
+                "back": f"Correct Answer: {r['correct_answer']}\nExplanation: {r['explanation']}",
+                "topic": doc_data['topic'],
+                "year_group": doc_data['year_group'],
+                "timestamp": firestore.SERVER_TIMESTAMP
+            } for r in results if not r['is_correct']
+        ]
+
+        for flashcard in flashcards:
+            db.collection('flashcards').document(flashcard['flashcard_id']).set(flashcard)
+
+        logger.debug(f"Generated {len(flashcards)} flashcards for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
+        return {
+            "flashcards": flashcards,
+            "next_step": "quiz_again",
+            "quiz_id": quiz_or_exam_id if not is_exam else None
+        }
+    except Exception as e:
+        logger.exception(f"Error generating flashcards for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}: {e}")
+        return {"error": str(e)}
+
+def generate_total_summary(db, user_id):
+    try:
+        # Initialize summary structure
+        summary = {
+            'failed_quizzes': [],
+            'failed_exams': [],
+            'weak_areas': [],
+            'recommendations': [],
+            'total_failed_attempts': 0,
+            'average_score': 0.0
+        }
+        
+        # Query failed quizzes (< 80% score)
+        quiz_query = (db.collection('quizzes')
+                     .where('user_id', '==', user_id)
+                     .where('score', '<', 0.8))
+        quizzes = quiz_query.stream()
+        
+        failed_quiz_count = 0
+        total_quiz_score = 0.0
+        weak_areas_set = set()
+        
+        for quiz in quizzes:
+            quiz_data = quiz.to_dict()
+            quiz_summary = {
+                'quiz_id': quiz.id,
+                'topic': quiz_data.get('topic', 'General'),
+                'correct': quiz_data.get('correct', 0),
+                'total': quiz_data.get('total_questions', 1),
+                'score': quiz_data.get('score', 0.0),
+                'incorrect_questions': []
+            }
+            # Collect incorrect questions
+            for result in quiz_data.get('results', []):
+                if not result.get('is_correct', False):
+                    question_topic = result.get('topic', quiz_data.get('topic', 'General'))
+                    weak_areas_set.add(question_topic)
+                    quiz_summary['incorrect_questions'].append({
+                        'question': result.get('question'),
+                        'user_answer': result.get('user_answer'),
+                        'correct_answer': result.get('correct_answer'),
+                        'topic': question_topic
+                    })
+            summary['failed_quizzes'].append(quiz_summary)
+            failed_quiz_count += 1
+            total_quiz_score += quiz_summary['score']
+        
+        # Query failed exams (< 80% score)
+        exam_query = (db.collection('exams')
+                     .where('user_id', '==', user_id)
+                     .where('score', '<', 0.8))
+        exams = exam_query.stream()
+        
+        failed_exam_count = 0
+        total_exam_score = 0.0
+        
+        for exam in exams:
+            exam_data = exam.to_dict()
+            exam_summary = {
+                'exam_id': exam.id,
+                'topic': exam_data.get('topic', 'General'),
+                'correct': exam_data.get('correct', 0),
+                'total': exam_data.get('total_questions', 1),
+                'score': exam_data.get('score', 0.0),
+                'incorrect_questions': []
+            }
+            # Collect incorrect questions
+            for result in exam_data.get('results', []):
+                if not result.get('is_correct', False):
+                    question_topic = result.get('topic', exam_data.get('topic', 'General'))
+                    weak_areas_set.add(question_topic)
+                    exam_summary['incorrect_questions'].append({
+                        'question': result.get('question'),
+                        'user_answer': result.get('user_answer'),
+                        'correct_answer': result.get('correct_answer'),
+                        'topic': question_topic
+                    })
+            summary['failed_exams'].append(exam_summary)
+            failed_exam_count += 1
+            total_exam_score += exam_summary['score']
+        
+        # Calculate totals and averages
+        summary['total_failed_attempts'] = failed_quiz_count + failed_exam_count
+        total_attempts = failed_quiz_count + failed_exam_count
+        total_score = total_quiz_score + total_exam_score
+        summary['average_score'] = (total_score / total_attempts) if total_attempts > 0 else 0.0
+        summary['weak_areas'] = list(weak_areas_set)
+        
+        # Generate recommendations based on weak areas
+        for area in summary['weak_areas']:
+            recommendation = f"Review {area} concepts. Practice related problems to improve."
+            summary['recommendations'].append(recommendation)
+        
+        return summary
+    except Exception as e:
+        return {'error': f'Failed to generate total summary: {str(e)}'}
