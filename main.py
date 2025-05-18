@@ -4,8 +4,8 @@ from flask_socketio import SocketIO, emit
 import firebase_admin
 from firebase_admin import credentials, firestore
 from Max import generate_gemini_response, process_image_with_gemini, process_document_with_gemini, process_pdf, process_docx, process_text_file, generate_image
-from Quiz import (generate_quiz_question, check_answer, get_user_data, save_quiz_score, generate_full_quiz,
-                  evaluate_quiz, save_to_exam_mode, generate_exam, evaluate_exam, generate_summary, generate_flashcards, generate_total_summary)
+from Quiz import generate_quiz_question, check_answer, get_user_data, save_quiz_score, generate_full_quiz, evaluate_quiz, save_to_exam_mode
+from exam import generate_full_exam, start_exam_attempt, submit_exam_answers, evaluate_exam, generate_summary, generate_flashcards, generate_total_summary
 from flashcards import generate_flashcards_from_quiz, generate_flashcards_from_document, generate_flashcards_from_input, get_user_flashcards, update_flashcard_status
 from gemini_image_processor import image_processor_bp
 import os
@@ -217,7 +217,7 @@ def index():
     logger.info(f"GET / request: headers={request.headers}, args={request.args}, remote_addr={request.remote_addr}")
     return jsonify({
         'status': 'Study Buddy backend running',
-        'message': 'Use POST to /chat, /generate_quiz, /process_document, etc.'
+        'message': 'Use POST to /chat, /generate_quiz, /generate_full_exam, /start_exam, /submit_exam, /evaluate_exam, /get_summary, /generate_flashcards, /get_total_summary, /process_document, etc.'
     }), 200
 
 @app.route('/chat', methods=['POST'])
@@ -359,7 +359,7 @@ def clear_chat():
         logger.info(f"Clearing chat history for user_id: {user_id}")
         user_ref = db.collection('users').document(user_id)
         user_ref.update({'conversation_history': []})
-        logger.debug(f"Chat history cleared for user_id: {user_id}")
+        logger.debug(f" Streaks cleared for user_id: {user_id}")
         return jsonify({'message': 'Chat history cleared successfully'}), 200
     except Exception as e:
         logger.exception(f"Clear chat error for user_id: {user_id}: {str(e)}")
@@ -491,6 +491,9 @@ def generate_full_quiz_endpoint():
         if not user_id or not question_count:
             logger.error(f"Missing required fields: user_id={user_id}, question_count={question_count}")
             return jsonify({'error': 'user_id and question_count are required'}), 400
+        if not isinstance(question_count, int) or question_count <= 0:
+            logger.error(f"Invalid question_count: {question_count}")
+            return jsonify({'error': 'question_count must be a positive integer'}), 400
         logger.info(f"Generating full quiz for user_id: {user_id}, topic: {topic}, question_count: {question_count}")
         user_data = db.collection('users').document(user_id).get().to_dict()
         if not user_data:
@@ -561,35 +564,95 @@ def evaluate_quiz_endpoint():
         logger.exception(f"Evaluate quiz error for user_id: {user_id}: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@app.route('/generate_exam', methods=['POST'])
-def generate_exam_endpoint():
+@app.route('/generate_full_exam', methods=['POST'])
+def generate_full_exam_endpoint():
     try:
         data = request.get_json()
         if not data:
-            logger.error("No JSON data provided in generate_exam request")
+            logger.error("No JSON data provided in generate_full_exam request")
             return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
-        quiz_id = data.get('quiz_id')
-        if not user_id or not quiz_id:
-            logger.error(f"Missing required fields: user_id={user_id}, quiz_id={quiz_id}")
-            return jsonify({'error': 'user_id and quiz_id are required'}), 400
-        logger.info(f"Generating exam for user_id: {user_id}, quiz_id: {quiz_id}")
+        topic = data.get('topic')
+        question_count = data.get('question_count', 10)
+        age = data.get('age')
+        year_group = data.get('year_group')
+        if not user_id:
+            logger.error("Missing user_id in generate_full_exam request")
+            return jsonify({'error': 'user_id is required'}), 400
+        if not isinstance(question_count, int) or question_count <= 0:
+            logger.error(f"Invalid question_count: {question_count}")
+            return jsonify({'error': 'question_count must be a positive integer'}), 400
+        logger.info(f"Generating full exam for user_id: {user_id}, topic: {topic}, question_count: {question_count}, age: {age}, year_group: {year_group}")
         user_data = db.collection('users').document(user_id).get().to_dict()
         if not user_data:
             logger.warning(f"User not found: {user_id}")
             return jsonify({'error': 'User not found'}), 404
-        quiz_data = db.collection('quizzes').document(quiz_id).get().to_dict()
-        if not quiz_data:
-            logger.warning(f"Quiz not found: {quiz_id}")
-            return jsonify({'error': 'Quiz not found'}), 404
-        result = generate_exam(db, user_id, quiz_id)
-        logger.debug(f"Generate exam response for user_id: {user_id}: {result}")
+        exam_data = generate_full_exam(db, user_id, topic, question_count, age, year_group)
+        logger.debug(f"Full exam response for user_id: {user_id}: {exam_data}")
+        if 'error' in exam_data:
+            logger.error(f"Full exam generation error: {exam_data['error']}")
+            return jsonify({'error': exam_data['error']}), 500
+        return jsonify(exam_data), 200
+    except Exception as e:
+        logger.exception(f"Generate full exam error for user_id: {user_id}: {str(e)}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+@app.route('/start_exam', methods=['POST'])
+def start_exam_endpoint():
+    try:
+        data = request.get_json()
+        if not data:
+            logger.error("No JSON data provided in start_exam request")
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+        user_id = data.get('user_id')
+        exam_id = data.get('exam_id')
+        if not user_id or not exam_id:
+            logger.error(f"Missing required fields: user_id={user_id}, exam_id={exam_id}")
+            return jsonify({'error': 'user_id and exam_id are required'}), 400
+        logger.info(f"Starting exam for user_id: {user_id}, exam_id: {exam_id}")
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
+        result = start_exam_attempt(db, user_id, exam_id)
+        logger.debug(f"Start exam response for user_id: {user_id}: {result}")
         if 'error' in result:
-            logger.error(f"Generate exam error: {result['error']}")
+            logger.error(f"Start exam error: {result['error']}")
             return jsonify({'error': result['error']}), 500
         return jsonify(result), 200
     except Exception as e:
-        logger.exception(f"Generate exam error for user_id: {user_id}: {str(e)}")
+        logger.exception(f"Start exam error for user_id: {user_id}: {str(e)}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+@app.route('/submit_exam', methods=['POST'])
+def submit_exam_endpoint():
+    try:
+        data = request.get_json()
+        if not data:
+            logger.error("No JSON data provided in submit_exam request")
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+        user_id = data.get('user_id')
+        exam_id = data.get('exam_id')
+        answers = data.get('answers')
+        if not user_id or not exam_id or not answers:
+            logger.error(f"Missing required fields: user_id={user_id}, exam_id={exam_id}, answers={'provided' if answers else 'missing'}")
+            return jsonify({'error': 'user_id, exam_id, and answers are required'}), 400
+        if not isinstance(answers, dict):
+            logger.error(f"Invalid answers format: {answers}")
+            return jsonify({'error': 'answers must be a dictionary'}), 400
+        logger.info(f"Submitting exam for user_id: {user_id}, exam_id: {exam_id}")
+        user_data = db.collection('users').document(user_id).get().to_dict()
+        if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
+        result = submit_exam_answers(db, user_id, exam_id, answers)
+        logger.debug(f"Submit exam response for user_id: {user_id}: {result}")
+        if 'error' in result:
+            logger.error(f"Submit exam error: {result['error']}")
+            return jsonify({'error': result['error']}), 500
+        return jsonify(result), 200
+    except Exception as e:
+        logger.exception(f"Submit exam error for user_id: {user_id}: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @app.route('/evaluate_exam', methods=['POST'])
