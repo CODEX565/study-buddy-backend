@@ -3,13 +3,15 @@ import json
 import uuid
 import random
 import logging
+from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from firebase_admin import firestore
-from datetime import datetime
-from Max import save_user_memory
+import firebase_admin
+from firebase_admin import credentials, firestore
+from collections import Counter
 
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -20,18 +22,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load environment variables
 load_dotenv()
-
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-client = genai.Client(api_key=GEMINI_API_KEY)
+if not GEMINI_API_KEY:
+    logger.error("GEMINI_API_KEY not found in environment variables")
+    raise ValueError("GEMINI_API_KEY is required")
 
-MAX_RETRIES = 5
-PASS_THRESHOLD = 0.7  # 70% correct to pass quiz or exam
+# Firestore client
+if not firebase_admin._apps:
+    cred = credentials.Certificate('studybuddy.json')
+    firebase_admin.initialize_app(cred)
+db = firestore.client()
 
-def map_age_to_year_group(age):
-    """Map age to an approximate year group."""
+PASS_THRESHOLD = 0.8  # 80% to pass quiz
+
+# --- Helper Functions ---
+def map_age_to_year_group(age_or_year):
+    if isinstance(age_or_year, str) and age_or_year.startswith('Year '):
+        return age_or_year  # Already a year group
     try:
-        age = int(age)
+        age = int(age_or_year)
         if 5 <= age <= 6:
             return 'Year 1'
         elif 7 <= age <= 8:
@@ -51,731 +62,473 @@ def map_age_to_year_group(age):
     except (ValueError, TypeError):
         return 'General'
 
-def get_user_data(db, user_id):
-    """Fetch user data including age, year_group, and study_topic."""
+def get_user_data(user_id):
+    user_ref = db.collection('users').document(user_id)
+    doc = user_ref.get()
+    return doc.to_dict() if doc.exists else None
+
+def determine_difficulty(proficiency):
+    if proficiency < 0.4:
+        return 'easy'
+    elif proficiency < 0.7:
+        return 'medium'
+    else:
+        return 'hard'
+
+def fetch_study_material_question(subject, topic, difficulty):
     try:
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            logger.warning(f"User not found: {user_id}")
-            return {"error": "User not found"}
-        
-        user_data = user_doc.to_dict()
-        return {
-            "age": user_data.get('age'),
-            "year_group": user_data.get('year_group', 'General'),
-            "study_topic": user_data.get('study_topic'),
-        }
+        questions_ref = db.collection('study_material').document(subject).collection(topic).document('questions')
+        doc = questions_ref.get()
+        if doc.exists:
+            questions = doc.to_dict().get('questions', [])
+            filtered = [q for q in questions if q.get('difficulty') == difficulty]
+            if filtered:
+                return random.choice(filtered)
+        return None
     except Exception as e:
-        logger.exception(f"Error fetching user data for user_id: {user_id}: {e}")
-        return {"error": "Failed to fetch user data"}
+        logger.warning(f"Error fetching study material: {e}")
+        return None
 
-def get_incorrect_questions(db, user_id, topic=None):
-    """Fetch incorrect questions for a user, optionally filtered by topic."""
+def generate_gemini_questions(subject, topic, difficulty, age, num_questions):
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    year_group = map_age_to_year_group(age)
+    year_group_prompt = f" suitable for {year_group} students" if year_group != 'General' else ""
+    prompt = f"""
+    Generate {num_questions} {difficulty} level {topic} questions in {subject}{year_group_prompt}.
+    Each question should have 1 correct answer and 3 incorrect answers, and a concise explanation (max 50-60 words).
+    Return as a JSON array in this format:
+    [
+      {{
+        "question": "...",
+        "answers": ["...", "...", "...", "..."],
+        "correct_answer": "...",
+        "explanation": "..."
+      }}, ...
+    ]
+    """
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(response_modalities=['TEXT'], temperature=0.9)
+    )
+    text = response.candidates[0].content.parts[0].text
+    json_text = text.strip('```json').strip('```').strip()
     try:
-        user_ref = db.collection('users').document(user_id)
-        user_data = user_ref.get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return []
-
-        quiz_history = user_data.get('quiz_history', [])
-        quiz_responses = user_data.get('quiz_responses', {})
-        incorrect_questions = []
-
-        for question in quiz_history:
-            if topic and question.get('topic') != topic:
-                continue
-            question_id = question.get('question_id')
-            if question_id in quiz_responses:
-                response = quiz_responses[question_id]
-                latest_attempt = response.get('attempts', [])[-1] if response.get('attempts') else response
-                if not latest_attempt.get('is_correct'):
-                    incorrect_questions.append(question)
-
-        logger.debug(f"Found {len(incorrect_questions)} incorrect questions for user_id: {user_id}, topic: {topic}")
-        return incorrect_questions
+        questions = json.loads(json_text)
+        return questions
     except Exception as e:
-        logger.exception(f"Error fetching incorrect questions for user_id: {user_id}: {e}")
+        logger.error(f"Gemini question generation error: {e}")
         return []
 
-def generate_quiz_question(db, user_id, topic=None, age=None, year_group=None, multiplayer=False, retry_count=0):
-    """Generate a single quiz question, reusing incorrect questions if available."""
-    try:
-        logger.info(f"Generating quiz question for user_id: {user_id}, topic: {topic}, age: {age}, year_group: {year_group}, multiplayer: {multiplayer}")
-        user_data = db.collection('users').document(user_id).get().to_dict() if db else {}
-        if not user_data and not multiplayer:
-            logger.warning(f"User not found: {user_id}")
-            return {"error": "User not found"}
+def get_random_topics_for_year_group(year_group):
+    # Define topics by year group
+    topics_by_year = {
+        'Year 1': {
+            'Mathematics': ['Numbers', 'Basic Addition', 'Basic Subtraction', 'Shapes', 'Counting'],
+            'English': ['Phonics', 'Basic Reading', 'Simple Writing', 'Vocabulary'],
+            'Science': ['Plants', 'Animals', 'Weather', 'Materials']
+        },
+        'Year 2': {
+            'Mathematics': ['Addition', 'Subtraction', 'Multiplication', 'Division', 'Fractions'],
+            'English': ['Reading Comprehension', 'Writing', 'Grammar', 'Spelling'],
+            'Science': ['Living Things', 'Materials', 'Space', 'Forces']
+        },
+        'Year 3': {
+            'Mathematics': ['Fractions', 'Decimals', 'Geometry', 'Measurement'],
+            'English': ['Creative Writing', 'Advanced Grammar', 'Punctuation'],
+            'Science': ['Light', 'Sound', 'Magnets', 'Rocks']
+        },
+        'Year 4': {
+            'Mathematics': ['Algebra', 'Statistics', 'Advanced Geometry', 'Problem Solving'],
+            'English': ['Advanced Writing', 'Literature', 'Poetry', 'Comprehension'],
+            'Science': ['Electricity', 'States of Matter', 'Food Chains', 'Human Body']
+        },
+        'Year 5': {
+            'Mathematics': ['Advanced Algebra', 'Probability', 'Complex Geometry'],
+            'English': ['Essay Writing', 'Advanced Literature', 'Text Analysis'],
+            'Science': ['Forces', 'Earth and Space', 'Properties of Materials']
+        },
+        'Year 6': {
+            'Mathematics': ['Advanced Problem Solving', 'Statistics and Data', 'Complex Operations'],
+            'English': ['Advanced Essay Writing', 'Text Analysis', 'Research Skills'],
+            'Science': ['Evolution', 'Living Systems', 'Light and Sound']
+        },
+        'Year 7': {
+            'Mathematics': ['Complex Algebra', 'Calculus Basics', 'Advanced Statistics'],
+            'English': ['Academic Writing', 'Critical Analysis', 'Research Methods'],
+            'Science': ['Chemistry Basics', 'Physics Principles', 'Biology Systems']
+        },
+        'General': {
+            'Mathematics': ['Basic Math', 'Problem Solving', 'Numbers', 'Geometry'],
+            'English': ['Reading', 'Writing', 'Grammar', 'Vocabulary'],
+            'Science': ['General Science', 'Nature', 'Technology', 'Environment']
+        }
+    }
+    
+    year_topics = topics_by_year.get(year_group, topics_by_year['General'])
+    selected_subject = random.choice(list(year_topics.keys()))
+    selected_topic = random.choice(year_topics[selected_subject])
+    
+    return selected_subject, selected_topic
 
-        quiz_history = get_quiz_history(db, user_id) if db else []
-        memories = user_data.get('memories', []) if user_data else []
-
-        if not multiplayer and db:
-            incorrect_questions = get_incorrect_questions(db, user_id, topic)
-            if incorrect_questions:
-                question = random.choice(incorrect_questions)
-                logger.info(f"Repeating incorrect question for user_id: {user_id}, question_id: {question['question_id']}")
-                return {
-                    "question_id": question['question_id'],
-                    "question": question['question'],
-                    "answers": question['answers'],
-                    "correct_answer": question['correct_answer'],
-                    "explanation": question.get('explanation', 'No explanation available.'),
-                    "topic": question['topic'],
-                    "year_group": question.get('year_group', 'General')
-                }
-
-        logger.info(f"Generating new question for user_id: {user_id}")
-
-        general_topics = [
-            'Python', 'JavaScript', 'Algorithms', 'Data Structures', 'Databases',
-            'Mathematics', 'Physics', 'Chemistry', 'Biology', 'History',
-            'Literature', 'English Grammar', 'Geography', 'Economics', 'Computer Science'
-        ]
-
-        effective_topic = topic
-        if effective_topic == 'General':
-            effective_topic = random.choice(general_topics)
-        elif not effective_topic:
-            for memory in memories:
-                if memory['type'] == 'study_topic':
-                    effective_topic = memory['value']
-                    break
-        if not effective_topic:
-            effective_topic = get_study_goal(db, user_id) or 'programming and coding'
-
-        if topic and topic != 'General' and not multiplayer and db:
-            save_user_memory(user_id, {
-                "type": "study_topic",
-                "value": topic,
-                "timestamp": datetime.now().isoformat()
-            })
-
-        effective_year_group = year_group or user_data.get('year_group', None)
-        if not effective_year_group and age:
-            effective_year_group = map_age_to_year_group(age)
-        if not effective_year_group:
-            effective_year_group = 'General'
-
-        history_str = ""
-        for i, question in enumerate(quiz_history):
-            history_str += f"Question {i+1}: {question['question']} | Answers: {', '.join(question['answers'])} | Correct Answer: {question['correct_answer']}\n"
-
-        year_group_prompt = f" suitable for {effective_year_group} students" if effective_year_group and effective_year_group != 'General' else ""
-        prompt = f"""
-        Generate a brand new random quiz question about {effective_topic}{year_group_prompt}.
-        Only one answer should be correct. Provide a concise step-by-step explanation (2-3 short steps, max 50-60 words) for the correct answer.
-        Return strictly in this JSON format:
-        {{
-          "question": "What is the capital of Australia?",
-          "answers": ["Sydney", "Melbourne", "Canberra", "Perth"],
-          "correct_answer": "Canberra",
-          "explanation": "Canberra is the capital. Step 1: Sydney and Melbourne are major cities but not capitals. Step 2: Canberra was chosen as a neutral capital."
-        }}
-        Do not repeat previous questions. Here is the previous quiz history:
-        {history_str}
-        """
-
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=['TEXT'],
-                temperature=0.9
-            )
-        )
-
-        if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
-            text = ""
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    text += part.text
-
-            start_idx = text.find("```json")
-            end_idx = text.find("```", start_idx + 7) if start_idx != -1 else -1
-            if start_idx != -1 and end_idx != -1:
-                json_text = text[start_idx + 7:end_idx].strip()
+# --- Core Functions ---
+def create_quiz(user_id, subject=None, topic=None, num_questions=10, age=None, year_group=None, group=None):
+    user_data = get_user_data(user_id)
+    if not user_data:
+        logger.error(f"User not found: {user_id}")
+        return {"error": "User not found"}
+    
+    # Handle age/year group logic
+    if year_group and year_group.startswith('Year '):
+        effective_year_group = year_group
+    else:
+        age_to_use = age or user_data.get('age', 15)
+        effective_year_group = map_age_to_year_group(age_to_use)
+    
+    # Get user's study topics and history
+    study_topics, subjects_mastery, _ = get_user_study_topics(user_id)
+    
+    # For general quizzes, select topics intelligently
+    if subject == 'General' or (subject is None and topic is None) or topic == 'General':
+        # First check if there are topics that need improvement
+        topics_to_improve = get_recommended_topics(user_id)
+        
+        if topics_to_improve:
+            # 70% chance to pick a topic that needs improvement
+            if random.random() < 0.7:
+                recommended = random.choice(topics_to_improve)
+                subject = recommended['subject']
+                topic = recommended['topic']
             else:
-                start_idx = text.find("{")
-                end_idx = text.rfind("}") + 1
-                json_text = text[start_idx:end_idx].strip() if start_idx != -1 and end_idx != -1 else text.strip()
-
-            try:
-                question_data = json.loads(json_text)
-
-                if not all(key in question_data for key in ['question', 'answers', 'correct_answer', 'explanation']):
-                    logger.error("Invalid quiz question format")
-                    return {"error": "Invalid quiz question format"}
-                if len(question_data['answers']) != 4 or question_data['correct_answer'] not in question_data['answers']:
-                    logger.error("Invalid answers or correct_answer")
-                    return {"error": "Invalid answers or correct_answer"}
-
-                for question in quiz_history:
-                    if question['question'] == question_data['question']:
-                        logger.warning(f"Duplicate question detected: {question_data['question']}")
-                        if retry_count < MAX_RETRIES:
-                            return generate_quiz_question(db, user_id, topic, age, effective_year_group, multiplayer, retry_count + 1)
-                        logger.error("Unable to generate unique quiz question after max retries")
-                        return {"error": "Unable to generate unique quiz question after max retries"}
-
-                question_id = str(uuid.uuid4())
-                question_data['question_id'] = question_id
-
-                if not multiplayer and db:
-                    history_entry = {
-                        "question_id": question_id,
-                        "question": question_data['question'],
-                        "answers": question_data['answers'],
-                        "correct_answer": question_data['correct_answer'],
-                        "explanation": question_data['explanation'],
-                        "topic": effective_topic,
-                        "year_group": effective_year_group,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    db.collection('users').document(user_id).update({
-                        "quiz_history": firestore.ArrayUnion([history_entry])
-                    })
-                    logger.info(f"Saved to quiz_history for user_id: {user_id}: {history_entry}")
-
-                return {
-                    "question_id": question_id,
-                    "question": question_data['question'],
-                    "answers": question_data['answers'],
-                    "correct_answer": question_data['correct_answer'],
-                    "explanation": question_data['explanation'],
-                    "topic": effective_topic,
-                    "year_group": effective_year_group
-                }
-
-            except json.JSONDecodeError as e:
-                logger.exception(f"JSON decode error: {e}")
-                return {"error": "Invalid JSON format in response"}
+                # 30% chance to pick a new topic appropriate for the year group
+                subject, topic = get_random_topics_for_year_group(effective_year_group)
         else:
-            logger.error("Empty or invalid response from Gemini API")
-            return {"error": "Unable to generate quiz question"}
+            # If no topics need improvement, pick age-appropriate topic
+            subject, topic = get_random_topics_for_year_group(effective_year_group)
+            
+        logger.info(f"Selected topic for general quiz: subject={subject}, topic={topic}")
+    
+    # Ensure subject and topic are set if they were None initially and not General
+    if subject is None or topic is None:
+         logger.error("Subject or topic not provided and could not be determined for a general quiz.")
+         return {"error": "Subject or topic not specified and could not be determined."}
 
-    except Exception as e:
-        logger.exception(f"Quiz generation error for user_id: {user_id}: {e}")
-        return {"error": "Unable to generate quiz question"}
+    logger.info(f"Attempting to create quiz for user {user_id}, Subject: {subject}, Topic: {topic}, Difficulty: determined based on mastery, Year Group: {effective_year_group}, Num Questions: {num_questions}")
 
-def save_quiz_response(db, user_id, question_id, user_answer, is_correct, question_data, multiplayer=False, game_code=None, score=0, response_time=None):
-    """Save user's quiz response to Firestore."""
-    try:
-        user_ref = db.collection('users').document(user_id)
+    proficiency = user_data.get('subjects_mastery', {}).get(subject, {}).get(topic, 0.0)
+    difficulty = determine_difficulty(proficiency)
+    questions = [] # Initialize empty questions list
+
+    # Try to fetch from study_material first
+    study_material_questions_count = 0
+    for _ in range(num_questions):
+        q = fetch_study_material_question(subject, topic, difficulty)
+        if q:
+            q['question_id'] = str(uuid.uuid4())
+            q['subject'] = subject
+            q['topic'] = topic
+            q['difficulty'] = difficulty
+            q['created_at'] = datetime.now().isoformat()
+            questions.append(q)
+            study_material_questions_count += 1
+
+    logger.info(f"Fetched {study_material_questions_count} questions from study material for topic {topic}.")
+
+    # If not enough, generate with Gemini
+    gemini_generated_count = 0
+    if len(questions) < num_questions:
+        needed = num_questions - len(questions)
+        logger.info(f"Need {needed} more questions. Attempting to generate with Gemini.")
+        gemini_questions = generate_gemini_questions(subject, topic, difficulty, effective_year_group, needed)
+        if gemini_questions:
+            for q in gemini_questions:
+                q['question_id'] = str(uuid.uuid4())
+                q['subject'] = subject
+                q['topic'] = topic
+                q['difficulty'] = difficulty
+                q['created_at'] = datetime.now().isoformat()
+                questions.append(q)
+                gemini_generated_count += 1
+            logger.info(f"Generated {gemini_generated_count} questions with Gemini.")
+        else:
+             logger.warning("Gemini did not generate any questions.")
+
+    logger.info(f"Total questions collected for quiz: {len(questions)}")
+
+    # Save quiz to user quiz_history
+    quiz_id = str(uuid.uuid4())
+    quiz_obj = {
+        "quiz_id": quiz_id,
+        "subject": subject,
+        "topic": topic,
+        "questions": questions,
+        "status": "in_progress",
+        "created_at": datetime.now().isoformat(),
+        "num_questions": num_questions,
+        "year_group": effective_year_group,
+        "group": group or ""
+    }
+    
+    db.collection('users').document(user_id).update({
+        "quiz_history": firestore.ArrayUnion([quiz_obj]),
+        "quiz_last_active": firestore.SERVER_TIMESTAMP  # This is fine as it's not in an array
+    })
+    
+    return {
+        "quiz_id": quiz_id,
+        "questions": questions,
+        "status": "in_progress",
+        "year_group": effective_year_group
+    }
+
+def submit_quiz(user_id, quiz_id, responses):
+    user_ref = db.collection('users').document(user_id)
+    user_data = user_ref.get().to_dict()
+    if not user_data:
+        return {"error": "User not found"}
+        
+    quiz_history = user_data.get('quiz_history', [])
+    quiz = next((q for q in quiz_history if q['quiz_id'] == quiz_id), None)
+    if not quiz:
+        return {"error": "Quiz not found"}
+        
+    questions = quiz['questions']
+    subject = quiz['subject']
+    topic = quiz['topic']
+    
+    # Validate responses
+    if len(responses) != len(questions):
+        return {"error": f"Expected {len(questions)} answers, got {len(responses)}"}
+        
+    correct_count = 0
+    quiz_responses = []
+    results = []
+    
+    for resp in responses:
+        question_id = resp['question_id']
+        user_answer = resp['user_answer']
+        timestamp = resp.get('timestamp', datetime.now().isoformat())
+        
+        question = next((q for q in questions if q['question_id'] == question_id), None)
+        if not question:
+            continue
+            
+        is_correct = user_answer == question['correct_answer']
+        if is_correct:
+            correct_count += 1
+            
         response_data = {
             "question_id": question_id,
-            "question": question_data['question'],
+            "question": question['question'],
             "user_answer": user_answer,
-            "correct_answer": question_data['correct_answer'],
+            "correct_answer": question['correct_answer'],
             "is_correct": is_correct,
-            "explanation": question_data.get('explanation', 'No explanation available.'),
-            "topic": question_data['topic'],
-            "year_group": question_data.get('year_group', 'General'),
-            "timestamp": firestore.SERVER_TIMESTAMP
+            "explanation": question.get('explanation', ''),
+            "topic": topic,
+            "subject": subject,
+            "timestamp": timestamp,
+            "difficulty": question.get('difficulty', 'medium')
         }
-        if multiplayer and game_code:
-            response_data.update({
-                "score": score,
-                "response_time": response_time,
-                "game_code": game_code
-            })
-            user_ref.update({
-                f"multiplayer_responses.{game_code}.{question_id}": response_data
-            })
-            logger.info(f"Saved multiplayer response for user_id: {user_id}, game_code: {game_code}, question_id: {question_id}, score: {score}")
-        else:
-            user_ref.update({
-                f"quiz_responses.{question_id}": response_data
-            })
-            logger.info(f"Saved single-player response for user_id: {user_id}, question_id: {question_id}, answer: {user_answer}, is_correct: {is_correct}")
-    except Exception as e:
-        logger.exception(f"Firestore error saving quiz response for user_id: {user_id}, question_id: {question_id}: {e}")
-
-def save_quiz_score(db, user_id, score, total_questions, topic, year_group, results, multiplayer=False, game_code=None):
-    """Save quiz score and results to Firestore."""
-    try:
-        user_ref = db.collection('users').document(user_id)
-        quiz_score_entry = {
-            'score': score,
-            'total_questions': total_questions,
-            'topic': topic or 'General',
-            'year_group': year_group or 'General',
-            'timestamp': datetime.utcnow().isoformat(),
-            'mode': 'multiplayer' if multiplayer else 'singleplayer',
-            'results': results
-        }
-        if multiplayer and game_code:
-            quiz_score_entry['game_code'] = game_code
-        user_ref.update({
-            'quiz_scores': firestore.ArrayUnion([quiz_score_entry])
+        quiz_responses.append(response_data)
+        results.append({
+            "question_id": question_id,
+            "is_correct": is_correct,
+            "user_answer": user_answer,
+            "correct_answer": question['correct_answer'],
+            "explanation": question.get('explanation', ''),
+            "question": question['question'],
+            "topic_mastery": subject_mastery.get(topic, 0.0)
         })
-        logger.info(f"Saved quiz score for user_id: {user_id}, score: {score}/{total_questions}, topic: {topic}, year_group: {year_group}")
-    except Exception as e:
-        logger.exception(f"Error saving quiz score for user_id: {user_id}: {e}")
 
-def save_quiz_to_history(db, user_id, question_data):
-    """Save quiz question to user's history."""
-    try:
-        user_ref = db.collection('users').document(user_id)
-        user_ref.update({
-            "quiz_history": firestore.ArrayUnion([question_data])
-        })
-        logger.debug(f"Saved quiz to history for user_id: {user_id}: {question_data}")
-    except Exception as e:
-        logger.exception(f"Firestore quiz history error for user_id: {user_id}: {e}")
+    score = correct_count / len(questions) if questions else 0
+    passed = score >= PASS_THRESHOLD
+    
+    # Update subjects_mastery with weighted difficulty adjustment
+    subjects_mastery = user_data.get('subjects_mastery', {})
+    subject_mastery = subjects_mastery.get(subject, {})
+    current_proficiency = subject_mastery.get(topic, 0.0)
+    
+    # Adjust mastery based on difficulty and score
+    difficulty_weights = {'easy': 0.5, 'medium': 1.0, 'hard': 1.5}
+    avg_difficulty = sum(difficulty_weights.get(q.get('difficulty', 'medium'), 1.0) for q in questions) / len(questions)
+    
+    delta = (0.1 * avg_difficulty) if score >= PASS_THRESHOLD else (-0.05 * avg_difficulty) if score < 0.5 else 0.0
+    new_proficiency = max(0.0, min(1.0, current_proficiency + delta))
+    
+    subject_mastery[topic] = new_proficiency
+    subjects_mastery[subject] = subject_mastery
+    
+    # Save quiz results with timestamps
+    quiz_summary = {
+        "subject": subject,
+        "topic": topic,
+        "correct": correct_count,
+        "wrong": len(questions) - correct_count,
+        "score": score,
+        "timestamp": firestore.SERVER_TIMESTAMP,
+        "difficulty": dict(Counter(q.get('difficulty', 'medium') for q in questions))
+    }
+    
+    quiz_score = {
+        "quiz_id": quiz_id,
+        "score": score,
+        "correct": correct_count,
+        "total": len(questions),
+        "timestamp": firestore.SERVER_TIMESTAMP,
+        "avg_difficulty": avg_difficulty
+    }
+    
+    # Update user data and learning history
+    performance_data = {
+        "quiz_id": quiz_id,
+        "score": score,
+        "mastery_level": new_proficiency,
+        "questions_total": len(questions),
+        "questions_correct": correct_count,
+        "difficulty_distribution": dict(Counter(q.get('difficulty', 'medium') for q in questions))
+    }
+    
+    # Update learning history
+    update_learning_history(user_id, subject, topic, performance_data)
+    
+    # Update user data
+    user_ref.update({
+        "subjects_mastery": subjects_mastery,
+        "quiz_summary": firestore.ArrayUnion([quiz_summary]),
+        "quiz_scores": firestore.ArrayUnion([quiz_score]),
+        "quiz_responses": firestore.ArrayUnion(quiz_responses),
+        "quiz_last_active": firestore.SERVER_TIMESTAMP,
+        f"quiz_history.{quiz_id}.status": "completed",
+        f"quiz_history.{quiz_id}.completed_at": firestore.SERVER_TIMESTAMP
+    })
 
-def get_quiz_history(db, user_id, topic=None, year_group=None):
-    """Fetch quiz history, optionally filtered by topic or year group."""
-    try:
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        quiz_history = user_doc.to_dict().get('quiz_history', []) if user_doc.exists else []
-        if topic:
-            quiz_history = [q for q in quiz_history if q.get('topic') == topic]
-        if year_group:
-            quiz_history = [q for q in quiz_history if q.get('year_group') == year_group]
-        logger.debug(f"Fetched quiz history for user_id: {user_id}, topic: {topic}, year_group: {year_group}, count: {len(quiz_history)}")
-        return quiz_history
-    except Exception as e:
-        logger.exception(f"Firestore error fetching quiz history for user_id: {user_id}: {e}")
-        return []
+    # Prepare next steps suggestions
+    next_steps = {
+        "flashcards": score < PASS_THRESHOLD,
+        "exam_ready": score >= PASS_THRESHOLD and new_proficiency >= 0.8,
+        "practice_needed": score < 0.7,
+        "suggested_topics": []
+    }
+    
+    if not passed:
+        wrong_topics = [r["topic"] for r in results if not r["is_correct"]]
+        next_steps["suggested_topics"] = list(set(wrong_topics))
 
-def get_study_goal(db, user_id):
-    """Fetch user's study goal."""
-    try:
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        study_goal = user_doc.to_dict().get('study_goal', None) if user_doc.exists else None
-        logger.debug(f"Fetched study goal for user_id: {user_id}: {study_goal}")
-        return study_goal
-    except Exception as e:
-        logger.exception(f"Firestore error fetching study goal for user_id: {user_id}: {e}")
-        return None
+    return {
+        "quiz_id": quiz_id,
+        "score": score,
+        "passed": passed,
+        "results": results,
+        "mastery_level": new_proficiency,
+        "next_steps": next_steps,
+        "timestamp": datetime.now().isoformat()
+    }
 
-def start_quiz_attempt(db, user_id, quiz_id):
-    """Start a quiz attempt and return the questions for the user to answer."""
-    try:
-        quiz_ref = db.collection('quizzes').document(quiz_id)
-        quiz_doc = quiz_ref.get()
-        if not quiz_doc.exists:
-            logger.warning(f"Quiz not found: {quiz_id}")
-            return {"error": "Quiz not found"}
+# --- Study Topics and Learning Management ---
+def get_user_study_topics(user_id):
+    """Fetch user's study topics and learning history."""
+    user_data = get_user_data(user_id)
+    if not user_data:
+        return [], {}
         
-        quiz_data = quiz_doc.to_dict()
-        questions = quiz_data.get('questions', [])
-        if not questions:
-            logger.error(f"No questions found in quiz: {quiz_id}")
-            return {"error": "No questions available"}
-        
-        return {
-            "quiz_id": quiz_id,
-            "questions": questions,
-            "status": "in_progress"
+    study_topics = user_data.get('study_topics', [])
+    subjects_mastery = user_data.get('subjects_mastery', {})
+    learning_history = user_data.get('learning_history', [])
+    
+    return study_topics, subjects_mastery, learning_history
+
+def update_learning_history(user_id, subject, topic, performance_data):
+    """Update user's learning history with new study activity."""
+    user_ref = db.collection('users').document(user_id)
+    
+    new_entry = {
+        "subject": subject,
+        "topic": topic,
+        "activity_type": "quiz",
+        "timestamp": datetime.now().isoformat(),
+        "performance": performance_data
+    }
+    
+    user_ref.update({
+        "learning_history": firestore.ArrayUnion([new_entry])
+    })
+
+def get_recommended_topics(user_id):
+    """Get recommended topics based on user's study history and mastery levels."""
+    study_topics, subjects_mastery, learning_history = get_user_study_topics(user_id)
+    
+    # Find topics that need improvement (mastery < 0.7)
+    topics_to_improve = []
+    for subject, topics in subjects_mastery.items():
+        for topic, mastery in topics.items():
+            if mastery < 0.7:  # Below 70% mastery
+                topics_to_improve.append({
+                    "subject": subject,
+                    "topic": topic,
+                    "mastery": mastery
+                })
+    
+    # Sort by mastery level (focus on lowest mastery first)
+    topics_to_improve.sort(key=lambda x: x['mastery'])
+    
+    return topics_to_improve
+
+def get_topics_for_year_group(year_group):
+    """Get age-appropriate topics for a year group."""
+    # Define topics by year group
+    topics_by_year = {
+        'Year 1': {
+            'Mathematics': ['Numbers', 'Basic Addition', 'Basic Subtraction', 'Shapes', 'Counting'],
+            'English': ['Phonics', 'Basic Reading', 'Simple Writing', 'Vocabulary'],
+            'Science': ['Plants', 'Animals', 'Weather', 'Materials']
+        },
+        'Year 2': {
+            'Mathematics': ['Addition', 'Subtraction', 'Multiplication', 'Division', 'Fractions'],
+            'English': ['Reading Comprehension', 'Writing', 'Grammar', 'Spelling'],
+            'Science': ['Living Things', 'Materials', 'Space', 'Forces']
+        },
+        'Year 3': {
+            'Mathematics': ['Fractions', 'Decimals', 'Geometry', 'Measurement'],
+            'English': ['Creative Writing', 'Advanced Grammar', 'Punctuation'],
+            'Science': ['Light', 'Sound', 'Magnets', 'Rocks']
+        },
+        'Year 4': {
+            'Mathematics': ['Algebra', 'Statistics', 'Advanced Geometry', 'Problem Solving'],
+            'English': ['Advanced Writing', 'Literature', 'Poetry', 'Comprehension'],
+            'Science': ['Electricity', 'States of Matter', 'Food Chains', 'Human Body']
+        },
+        'Year 5': {
+            'Mathematics': ['Advanced Algebra', 'Probability', 'Complex Geometry'],
+            'English': ['Essay Writing', 'Advanced Literature', 'Text Analysis'],
+            'Science': ['Forces', 'Earth and Space', 'Properties of Materials']
+        },
+        'Year 6': {
+            'Mathematics': ['Advanced Problem Solving', 'Statistics and Data', 'Complex Operations'],
+            'English': ['Advanced Essay Writing', 'Text Analysis', 'Research Skills'],
+            'Science': ['Evolution', 'Living Systems', 'Light and Sound']
+        },
+        'Year 7': {
+            'Mathematics': ['Complex Algebra', 'Calculus Basics', 'Advanced Statistics'],
+            'English': ['Academic Writing', 'Critical Analysis', 'Research Methods'],
+            'Science': ['Chemistry Basics', 'Physics Principles', 'Biology Systems']
+        },
+        'General': {
+            'Mathematics': ['Basic Math', 'Problem Solving', 'Numbers', 'Geometry'],
+            'English': ['Reading', 'Writing', 'Grammar', 'Vocabulary'],
+            'Science': ['General Science', 'Nature', 'Technology', 'Environment']
         }
-    except Exception as e:
-        logger.exception(f"Error starting quiz attempt for user_id: {user_id}, quiz_id: {quiz_id}: {e}")
-        return {"error": str(e)}
-
-def check_answer(db, user_id, question_id, user_answer, multiplayer=False, game_code=None, response_time=None):
-    """Check if the user's answer is correct and save the response."""
-    try:
-        user_ref = db.collection('users').document(user_id)
-        user_data = user_ref.get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return {"error": "User not found"}
-
-        quiz_history = get_quiz_history(db, user_id)
-        for question in quiz_history:
-            if question.get('question_id') == question_id:
-                correct_answer = question.get('correct_answer')
-                is_correct = user_answer == correct_answer
-                score = 0
-                if multiplayer and is_correct:
-                    max_time = 15
-                    score = 100
-                    if response_time and response_time < max_time:
-                        score += int((1 - response_time / max_time) * 50)
-                save_quiz_response(db, user_id, question_id, user_answer, is_correct, question, multiplayer, game_code, score, response_time)
-                logger.info(f"Checked answer for user_id: {user_id}, question_id: {question_id}, is_correct: {is_correct}, score: {score if multiplayer else 0}")
-                return {
-                    "result": "correct" if is_correct else "incorrect",
-                    "correct_answer": correct_answer,
-                    "score": score if multiplayer else 0
-                }
-
-        logger.error(f"Question not found for user_id: {user_id}, question_id: {question_id}")
-        return {"error": "Question not found"}
-
-    except Exception as e:
-        logger.exception(f"Check answer error for user_id: {user_id}, question_id: {question_id}: {e}")
-        return {"error": "Failed to check answer"}
-
-def generate_full_quiz(db, user_id, topic=None, question_count=5, age=None, year_group=None, group=None):
-    """Generate a full quiz with multiple questions."""
-    try:
-        logger.info(f"Generating full quiz for user_id: {user_id}, topic: {topic}, question_count: {question_count}")
-        quiz_id = str(uuid.uuid4())
-        questions = []
-        for _ in range(question_count):
-            question_data = generate_quiz_question(db, user_id, topic, age, year_group)
-            if "error" in question_data:
-                logger.error(f"Failed to generate question: {question_data['error']}")
-                continue
-            question_data['user_id'] = user_id
-            question_data['timestamp'] = firestore.SERVER_TIMESTAMP
-            questions.append(question_data)
-            db.collection('quizzes').document(question_data['question_id']).set(question_data)
-
-        quiz_data = {
-            "quiz_id": quiz_id,
-            "user_id": user_id,
-            "topic": topic or "General",
-            "year_group": year_group or "General",
-            "group": group,
-            "questions": questions,
-            "status": "pending",
-            "timestamp": firestore.SERVER_TIMESTAMP
-        }
-        db.collection('quizzes').document(quiz_id).set(quiz_data)
-        logger.debug(f"Generated full quiz for user_id: {user_id}: {quiz_data}")
-        return quiz_data
-    except Exception as e:
-        logger.exception(f"Error generating full quiz for user_id: {user_id}: {e}")
-        return {"error": str(e)}
-
-def evaluate_quiz(db, user_id, quiz_id):
-    """Evaluate quiz results and determine next steps."""
-    try:
-        quiz_ref = db.collection('quizzes').document(quiz_id)
-        quiz_doc = quiz_ref.get()
-        if not quiz_doc.exists:
-            logger.warning(f"Quiz not found: {quiz_id}")
-            return {"error": "Quiz not found"}
-
-        quiz_data = quiz_doc.to_dict()
-        questions = quiz_data.get('questions', [])
-        quiz_responses = db.collection('users').document(user_id).get().to_dict().get('quiz_responses', {})
-
-        correct_count = 0
-        results = []
-        for question in questions:
-            question_id = question['question_id']
-            response = quiz_responses.get(question_id, {})
-            is_correct = response.get('is_correct', False)
-            if is_correct:
-                correct_count += 1
-            results.append({
-                "question_id": question_id,
-                "question": question['question'],
-                "user_answer": response.get('user_answer'),
-                "correct_answer": question['correct_answer'],
-                "is_correct": is_correct,
-                "explanation": question.get('explanation', 'No explanation available.')
+    }
+    
+    year_topics = topics_by_year.get(year_group, topics_by_year['General'])
+    
+    # Add learning history to recommended topics
+    recommended = []
+    for subject, topics in year_topics.items():
+        for topic in topics:
+            recommended.append({
+                "subject": subject,
+                "topic": topic,
+                "type": "year_appropriate"
             })
-
-        score = correct_count / len(questions) if questions else 0
-        passed = score >= PASS_THRESHOLD
-
-        quiz_data['status'] = 'completed'
-        quiz_data['score'] = score
-        quiz_data['results'] = results
-        quiz_ref.update(quiz_data)
-
-        save_quiz_score(db, user_id, correct_count, len(questions), quiz_data['topic'], quiz_data['year_group'], results)
-
-        if passed:
-            exam_id = save_to_exam_mode(db, user_id, quiz_id, quiz_data)
-            logger.info(f"Quiz passed for user_id: {user_id}, quiz_id: {quiz_id}, saved to exam mode: {exam_id}")
-            return {
-                "result": "pass",
-                "score": score,
-                "next_step": "exam_mode",
-                "exam_id": exam_id,
-                "results": results
-            }
-        else:
-            summary = generate_summary(db, user_id, quiz_id)
-            logger.info(f"Quiz failed for user_id: {user_id}, quiz_id: {quiz_id}, proceeding to summary")
-            return {
-                "result": "fail",
-                "score": score,
-                "next_step": "summary",
-                "summary": summary,
-                "results": results
-            }
-
-    except Exception as e:
-        logger.exception(f"Error evaluating quiz for user_id: {user_id}, quiz_id: {quiz_id}: {e}")
-        return {"error": str(e)}
-
-def save_to_exam_mode(db, user_id, quiz_id, quiz_data):
-    """Save quiz to exam mode for a full exam-like experience."""
-    try:
-        exam_id = str(uuid.uuid4())
-        exam_data = {
-            "exam_id": exam_id,
-            "user_id": user_id,
-            "quiz_id": quiz_id,
-            "topic": quiz_data['topic'],
-            "year_group": quiz_data['year_group'],
-            "group": quiz_data.get('group'),
-            "questions": quiz_data['questions'],
-            "status": "pending",
-            "timestamp": firestore.SERVER_TIMESTAMP
-        }
-        db.collection('exams').document(exam_id).set(exam_data)
-        logger.debug(f"Saved exam for user_id: {user_id}, exam_id: {exam_id}")
-        return exam_id
-    except Exception as e:
-        logger.exception(f"Error saving to exam mode for user_id: {user_id}: {e}")
-        return None
-
-def generate_exam(db, user_id, exam_id):
-    """Generate exam data for the user."""
-    try:
-        exam_ref = db.collection('exams').document(exam_id)
-        exam_doc = exam_ref.get()
-        if not exam_doc.exists:
-            logger.warning(f"Exam not found: {exam_id}")
-            return {"error": "Exam not found"}
-
-        exam_data = exam_doc.to_dict()
-        return exam_data
-    except Exception as e:
-        logger.exception(f"Error generating exam for user_id: {user_id}, exam_id: {exam_id}: {e}")
-        return {"error": str(e)}
-
-def evaluate_exam(db, user_id, exam_id):
-    """Evaluate exam results and determine next steps."""
-    try:
-        exam_ref = db.collection('exams').document(exam_id)
-        exam_doc = exam_ref.get()
-        if not exam_doc.exists:
-            logger.warning(f"Exam not found: {exam_id}")
-            return {"error": "Exam not found"}
-
-        exam_data = exam_doc.to_dict()
-        questions = exam_data.get('questions', [])
-        quiz_responses = db.collection('users').document(user_id).get().to_dict().get('quiz_responses', {})
-
-        correct_count = 0
-        results = []
-        for question in questions:
-            question_id = question['question_id']
-            response = quiz_responses.get(question_id, {})
-            is_correct = response.get('is_correct', False)
-            if is_correct:
-                correct_count += 1
-            results.append({
-                "question_id": question_id,
-                "question": question['question'],
-                "user_answer": response.get('user_answer'),
-                "correct_answer": question['correct_answer'],
-                "is_correct": is_correct,
-                "explanation": question.get('explanation', 'No explanation available.')
-            })
-
-        score = correct_count / len(questions) if questions else 0
-        passed = score >= PASS_THRESHOLD
-
-        exam_data['status'] = 'completed'
-        exam_data['score'] = score
-        exam_data['results'] = results
-        exam_ref.update(exam_data)
-
-        if passed:
-            feedback = {
-                "message": f"Congratulations! You passed the exam with a score of {score*100:.0f}%. Great job!",
-                "date": datetime.utcnow().isoformat()
-            }
-            logger.info(f"Exam passed for user_id: {user_id}, exam_id: {exam_id}")
-            return {
-                "result": "pass",
-                "score": score,
-                "next_step": "success",
-                "results": results,
-                "feedback": feedback
-            }
-        else:
-            summary = generate_summary(db, user_id, exam_id, is_exam=True)
-            logger.info(f"Exam failed for user_id: {user_id}, exam_id: {exam_id}, proceeding to summary")
-            return {
-                "result": "fail",
-                "score": score,
-                "next_step": "summary",
-                "summary": summary,
-                "results": results
-            }
-
-    except Exception as e:
-        logger.exception(f"Error evaluating exam for user_id: {user_id}, exam_id: {exam_id}: {e}")
-        return {"error": str(e)}
-
-def generate_summary(db, user_id, quiz_or_exam_id, is_exam=False):
-    """Generate a summary of quiz or exam results."""
-    try:
-        collection = 'exams' if is_exam else 'quizzes'
-        doc_ref = db.collection(collection).document(quiz_or_exam_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            logger.warning(f"{'Exam' if is_exam else 'Quiz'} not found: {quiz_or_exam_id}")
-            return {"error": f"{'Exam' if is_exam else 'Quiz'} not found"}
-
-        doc_data = doc.to_dict()
-        results = doc_data.get('results', [])
-        summary = {
-            "score": doc_data.get('score', 0),
-            "total_questions": len(doc_data.get('questions', [])),
-            "correct_count": sum(1 for r in results if r['is_correct']),
-            "incorrect_questions": [
-                {
-                    "question_id": r['question_id'],
-                    "question": r['question'],
-                    "user_answer": r['user_answer'],
-                    "correct_answer": r['correct_answer'],
-                    "explanation": r['explanation']
-                } for r in results if not r['is_correct']
-            ],
-            "next_step": "flashcards"
-        }
-        logger.debug(f"Generated summary for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
-        return summary
-    except Exception as e:
-        logger.exception(f"Error generating summary for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}: {e}")
-        return {"error": str(e)}
-
-def generate_flashcards(db, user_id, quiz_or_exam_id, is_exam=False):
-    """Generate flashcards based on incorrect questions."""
-    try:
-        collection = 'exams' if is_exam else 'quizzes'
-        doc_ref = db.collection(collection).document(quiz_or_exam_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            logger.warning(f"{'Exam' if is_exam else 'Quiz'} not found: {quiz_or_exam_id}")
-            return {"error": f"{'Exam' if is_exam else 'Quiz'} not found"}
-
-        doc_data = doc.to_dict()
-        results = doc_data.get('results', [])
-        flashcards = [
-            {
-                "flashcard_id": str(uuid.uuid4()),
-                "question_id": r['question_id'],
-                "front": r['question'],
-                "back": f"Correct Answer: {r['correct_answer']}\nExplanation: {r['explanation']}",
-                "topic": doc_data['topic'],
-                "year_group": doc_data['year_group'],
-                "timestamp": firestore.SERVER_TIMESTAMP
-            } for r in results if not r['is_correct']
-        ]
-
-        for flashcard in flashcards:
-            db.collection('flashcards').document(flashcard['flashcard_id']).set(flashcard)
-
-        logger.debug(f"Generated {len(flashcards)} flashcards for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
-        return {
-            "flashcards": flashcards,
-            "next_step": "quiz_again",
-            "quiz_id": quiz_or_exam_id if not is_exam else None
-        }
-    except Exception as e:
-        logger.exception(f"Error generating flashcards for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}: {e}")
-        return {"error": str(e)}
-
-def generate_total_summary(db, user_id):
-    try:
-        # Initialize summary structure
-        summary = {
-            'failed_quizzes': [],
-            'failed_exams': [],
-            'weak_areas': [],
-            'recommendations': [],
-            'total_failed_attempts': 0,
-            'average_score': 0.0
-        }
-        
-        # Query failed quizzes (< 80% score)
-        quiz_query = (db.collection('quizzes')
-                     .where('user_id', '==', user_id)
-                     .where('score', '<', 0.8))
-        quizzes = quiz_query.stream()
-        
-        failed_quiz_count = 0
-        total_quiz_score = 0.0
-        weak_areas_set = set()
-        
-        for quiz in quizzes:
-            quiz_data = quiz.to_dict()
-            quiz_summary = {
-                'quiz_id': quiz.id,
-                'topic': quiz_data.get('topic', 'General'),
-                'correct': sum(1 for r in quiz_data.get('results', []) if r.get('is_correct', False)),
-                'total': quiz_data.get('total_questions', 1),
-                'score': quiz_data.get('score', 0.0),
-                'incorrect_questions': []
-            }
-            # Collect incorrect questions
-            for result in quiz_data.get('results', []):
-                if not result.get('is_correct', False):
-                    question_topic = result.get('topic', quiz_data.get('topic', 'General'))
-                    weak_areas_set.add(question_topic)
-                    quiz_summary['incorrect_questions'].append({
-                        'question': result.get('question'),
-                        'user_answer': result.get('user_answer'),
-                        'correct_answer': result.get('correct_answer'),
-                        'topic': question_topic
-                    })
-            summary['failed_quizzes'].append(quiz_summary)
-            failed_quiz_count += 1
-            total_quiz_score += quiz_summary['score']
-        
-        # Query failed exams (< 80% score)
-        exam_query = (db.collection('exams')
-                     .where('user_id', '==', user_id)
-                     .where('score', '<', 0.8))
-        exams = exam_query.stream()
-        
-        failed_exam_count = 0
-        total_exam_score = 0.0
-        
-        for exam in exams:
-            exam_data = exam.to_dict()
-            exam_summary = {
-                'exam_id': exam.id,
-                'topic': exam_data.get('topic', 'General'),
-                'correct': sum(1 for r in exam_data.get('results', []) if r.get('is_correct', False)),
-                'total': exam_data.get('total_questions', 1),
-                'score': exam_data.get('score', 0.0),
-                'incorrect_questions': []
-            }
-            # Collect incorrect questions
-            for result in exam_data.get('results', []):
-                if not result.get('is_correct', False):
-                    question_topic = result.get('topic', exam_data.get('topic', 'General'))
-                    weak_areas_set.add(question_topic)
-                    exam_summary['incorrect_questions'].append({
-                        'question': result.get('question'),
-                        'user_answer': result.get('user_answer'),
-                        'correct_answer': result.get('correct_answer'),
-                        'topic': question_topic
-                    })
-            summary['failed_exams'].append(exam_summary)
-            failed_exam_count += 1
-            total_exam_score += exam_summary['score']
-        
-        # Calculate totals and averages
-        summary['total_failed_attempts'] = failed_quiz_count + failed_exam_count
-        total_attempts = failed_quiz_count + failed_exam_count
-        total_score = total_quiz_score + total_exam_score
-        summary['average_score'] = (total_score / total_attempts) if total_attempts > 0 else 0.0
-        summary['weak_areas'] = list(weak_areas_set)
-        
-        # Generate recommendations based on weak areas
-        for area in summary['weak_areas']:
-            recommendation = f"Review {area} concepts. Practice related problems to improve."
-            summary['recommendations'].append(recommendation)
-        
-        return summary
-    except Exception as e:
-        return {'error': f'Failed to generate total summary: {str(e)}'}
+    
+    return recommended

@@ -320,3 +320,640 @@ TypeError: 'NoneType' object is not subscriptable
 2025-05-12 21:44:34,395 - INFO - 192.168.4.20 - - [12/May/2025 21:44:34] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
 2025-05-12 21:53:45,327 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/Max.py', reloading
 2025-05-12 21:53:50,855 - INFO -  * Restarting with stat
+2025-05-23 17:06:06,788 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-23 17:06:06,790 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-23 17:06:06,796 - INFO -  * Restarting with stat
+2025-05-23 17:06:20,705 - WARNING -  * Debugger is active!
+2025-05-23 17:06:20,743 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 17:06:31,409 - INFO - Fetched user data for user_id: user123
+2025-05-23 17:06:31,415 - INFO - 192.168.4.20 - - [23/May/2025 17:06:31] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 17:06:31,426 - INFO - Fetched user data for user_id: user123
+2025-05-23 17:06:31,431 - INFO - 192.168.4.20 - - [23/May/2025 17:06:31] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 17:06:49,046 - INFO - Fetched user data for user_id: user123
+2025-05-23 17:06:49,055 - INFO - 192.168.4.20 - - [23/May/2025 17:06:49] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 17:06:51,353 - INFO - Cleared study topic for user_id: user123
+2025-05-23 17:06:51,354 - INFO - 192.168.4.20 - - [23/May/2025 17:06:51] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 17:07:15,181 - INFO - 192.168.4.20 - - [23/May/2025 17:07:15] "[33mPOST /generate_quiz HTTP/1.1[0m" 404 -
+2025-05-23 17:15:40,765 - INFO - Fetched user data for user_id: user123
+2025-05-23 17:15:40,773 - INFO - 192.168.4.20 - - [23/May/2025 17:15:40] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 17:15:41,264 - INFO - Cleared study topic for user_id: user123
+2025-05-23 17:15:41,264 - INFO - 192.168.4.20 - - [23/May/2025 17:15:41] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 17:15:59,003 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 17:15:59,006 - INFO - 192.168.4.20 - - [23/May/2025 17:15:59] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 18:03:38,751 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-23 18:03:38,754 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-23 18:03:38,759 - INFO -  * Restarting with stat
+2025-05-23 18:03:49,175 - WARNING -  * Debugger is active!
+2025-05-23 18:03:49,212 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 18:04:54,208 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:04:54,224 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:04:54,233 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:04:54,257 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:04:54,269 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:04:54,275 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:04:54,474 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:04:54,482 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:04:54,838 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:04:54,841 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:04:54,935 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:04:54,935 - INFO - 192.168.4.20 - - [23/May/2025 18:04:54] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:04:55,368 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:04:55,369 - INFO - 192.168.4.20 - - [23/May/2025 18:04:55] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:04:55,386 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:04:55,387 - INFO - 192.168.4.20 - - [23/May/2025 18:04:55] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:04:55,448 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:04:55,448 - INFO - 192.168.4.20 - - [23/May/2025 18:04:55] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:04:55,462 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:04:55,463 - INFO - 192.168.4.20 - - [23/May/2025 18:04:55] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:05:04,303 - INFO - Fetched user data for user_id: user123
+2025-05-23 18:05:04,308 - INFO - 192.168.4.20 - - [23/May/2025 18:05:04] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 18:05:04,628 - INFO - Cleared study topic for user_id: user123
+2025-05-23 18:05:04,629 - INFO - 192.168.4.20 - - [23/May/2025 18:05:04] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 18:05:20,427 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 18:05:20,430 - INFO - 192.168.4.20 - - [23/May/2025 18:05:20] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:18:49,016 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-23 19:18:49,020 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-23 19:18:49,026 - INFO -  * Restarting with stat
+2025-05-23 19:18:58,601 - WARNING -  * Debugger is active!
+2025-05-23 19:18:58,637 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:19:08,759 - INFO - Fetched user data for user_id: user123
+2025-05-23 19:19:08,768 - INFO - Fetched user data for user_id: user123
+2025-05-23 19:19:08,771 - INFO - 192.168.4.20 - - [23/May/2025 19:19:08] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 19:19:08,774 - INFO - 192.168.4.20 - - [23/May/2025 19:19:08] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 19:19:11,103 - INFO - Cleared study topic for user_id: user123
+2025-05-23 19:19:11,105 - INFO - 192.168.4.20 - - [23/May/2025 19:19:11] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 19:19:25,287 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:19:25,290 - INFO - 192.168.4.20 - - [23/May/2025 19:19:25] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:22:31,264 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:22:31,269 - INFO - 192.168.4.20 - - [23/May/2025 19:22:31] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:22:32,936 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:22:32,937 - INFO - 192.168.4.20 - - [23/May/2025 19:22:32] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:22:58,555 - INFO - Fetched user data for user_id: user123
+2025-05-23 19:22:58,561 - INFO - 192.168.4.20 - - [23/May/2025 19:22:58] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 19:22:59,018 - INFO - Cleared study topic for user_id: user123
+2025-05-23 19:22:59,019 - INFO - 192.168.4.20 - - [23/May/2025 19:22:59] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 19:23:14,042 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:23:14,045 - INFO - 192.168.4.20 - - [23/May/2025 19:23:14] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:32:50,738 - INFO - Fetched user data for user_id: user123
+2025-05-23 19:32:50,756 - INFO - 192.168.4.20 - - [23/May/2025 19:32:50] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-23 19:32:53,108 - INFO - Cleared study topic for user_id: user123
+2025-05-23 19:32:53,108 - INFO - 192.168.4.20 - - [23/May/2025 19:32:53] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-23 19:33:06,534 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:33:06,537 - INFO - 192.168.4.20 - - [23/May/2025 19:33:06] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:36:23,751 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:36:23,761 - INFO - 192.168.4.20 - - [23/May/2025 19:36:23] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:40:35,836 - ERROR - Missing required fields: user_id, subject, or topic
+2025-05-23 19:40:35,858 - INFO - 192.168.4.20 - - [23/May/2025 19:40:35] "[31m[1mPOST /start_quiz HTTP/1.1[0m" 400 -
+2025-05-23 19:41:52,766 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-23 19:41:52,773 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-23 19:41:52,781 - INFO -  * Restarting with stat
+2025-05-23 19:42:09,356 - WARNING -  * Debugger is active!
+2025-05-23 19:42:09,401 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:48:06,213 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-23 19:48:10,513 - INFO -  * Restarting with stat
+2025-05-23 19:48:35,756 - WARNING -  * Debugger is active!
+2025-05-23 19:48:35,823 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:48:55,692 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 19:48:56,732 - INFO -  * Restarting with stat
+2025-05-23 19:49:10,264 - WARNING -  * Debugger is active!
+2025-05-23 19:49:10,293 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:49:25,054 - INFO - 192.168.4.20 - - [23/May/2025 19:49:25] "[33mPOST /chat HTTP/1.1[0m" 404 -
+2025-05-23 19:49:56,045 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 19:49:57,132 - INFO -  * Restarting with stat
+2025-05-23 19:50:10,779 - WARNING -  * Debugger is active!
+2025-05-23 19:50:10,804 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:51:15,497 - INFO - 192.168.4.20 - - [23/May/2025 19:51:15] "[33mPOST /process_image HTTP/1.1[0m" 404 -
+2025-05-23 19:52:22,773 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:52:24,049 - INFO -  * Restarting with stat
+2025-05-23 19:52:40,662 - WARNING -  * Debugger is active!
+2025-05-23 19:52:40,698 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:53:02,208 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:53:03,864 - INFO -  * Restarting with stat
+2025-05-23 19:53:21,190 - WARNING -  * Debugger is active!
+2025-05-23 19:53:21,221 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:54:09,133 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:54:10,138 - INFO -  * Restarting with stat
+2025-05-23 19:54:25,767 - WARNING -  * Debugger is active!
+2025-05-23 19:54:25,789 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:55:27,542 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:55:28,386 - INFO -  * Restarting with stat
+2025-05-23 19:55:44,854 - WARNING -  * Debugger is active!
+2025-05-23 19:55:44,934 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:55:58,532 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:55:59,134 - INFO -  * Restarting with stat
+2025-05-23 19:56:11,481 - WARNING -  * Debugger is active!
+2025-05-23 19:56:11,511 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 19:57:14,003 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/max.py', reloading
+2025-05-23 19:57:14,842 - INFO -  * Restarting with stat
+2025-05-23 19:57:29,159 - WARNING -  * Debugger is active!
+2025-05-23 19:57:29,185 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:00:29,334 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 20:00:30,309 - INFO -  * Restarting with stat
+2025-05-23 20:00:48,202 - WARNING -  * Debugger is active!
+2025-05-23 20:00:48,255 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:00:58,525 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 20:00:59,065 - INFO -  * Restarting with stat
+2025-05-23 20:01:12,923 - WARNING -  * Debugger is active!
+2025-05-23 20:01:12,952 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:01:44,279 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 20:01:44,874 - INFO -  * Restarting with stat
+2025-05-23 20:01:58,765 - WARNING -  * Debugger is active!
+2025-05-23 20:01:58,827 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:02:56,152 - INFO - 192.168.4.20 - - [23/May/2025 20:02:56] "[33mPOST /chat HTTP/1.1[0m" 404 -
+2025-05-23 20:03:52,556 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 20:03:53,247 - INFO -  * Restarting with stat
+2025-05-23 20:04:04,396 - WARNING -  * Debugger is active!
+2025-05-23 20:04:04,414 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:32:11,894 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-23 20:32:14,803 - INFO -  * Restarting with stat
+2025-05-23 20:32:30,031 - WARNING -  * Debugger is active!
+2025-05-23 20:32:30,078 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 20:37:19,933 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-23 20:37:22,310 - INFO -  * Restarting with stat
+2025-05-23 20:37:36,615 - WARNING -  * Debugger is active!
+2025-05-23 20:37:36,674 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 21:10:28,790 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-23 21:10:31,697 - INFO -  * Restarting with stat
+2025-05-23 21:11:02,538 - WARNING -  * Debugger is active!
+2025-05-23 21:11:02,590 - INFO -  * Debugger PIN: 461-607-501
+2025-05-23 21:53:44,963 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-23 21:53:44,970 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-23 21:53:44,979 - INFO -  * Restarting with stat
+2025-05-24 13:26:16,831 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-24 13:26:16,834 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-24 13:26:16,851 - INFO -  * Restarting with stat
+2025-05-24 13:26:29,385 - WARNING -  * Debugger is active!
+2025-05-24 13:26:29,452 - INFO -  * Debugger PIN: 461-607-501
+2025-05-24 13:27:15,584 - INFO - 192.168.4.20 - - [24/May/2025 13:27:15] "[33mPOST /chat HTTP/1.1[0m" 404 -
+2025-05-24 13:33:16,469 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-24 13:33:16,474 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-24 13:33:16,478 - INFO -  * Restarting with stat
+2025-05-24 13:33:31,951 - WARNING -  * Debugger is active!
+2025-05-24 13:33:32,123 - INFO -  * Debugger PIN: 461-607-501
+2025-05-24 13:33:38,114 - INFO - Cleared chat history for user_id: user123
+2025-05-24 13:33:38,118 - INFO - 192.168.4.20 - - [24/May/2025 13:33:38] "POST /clear_chat HTTP/1.1" 200 -
+2025-05-24 13:33:47,378 - ERROR - Error in max_chat: process_user_input() missing 1 required positional argument: 'user_data'
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 228, in chat
+    user_data = process_user_input(user_input, user_data)
+TypeError: process_user_input() missing 1 required positional argument: 'user_data'
+2025-05-24 13:33:47,383 - INFO - 192.168.4.20 - - [24/May/2025 13:33:47] "[35m[1mPOST /chat HTTP/1.1[0m" 500 -
+2025-05-25 13:46:06,052 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-25 13:46:06,069 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-25 13:46:06,099 - INFO -  * Restarting with stat
+2025-05-25 13:46:26,811 - WARNING -  * Debugger is active!
+2025-05-25 13:46:26,872 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 13:47:09,864 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:09,879 - INFO - 192.168.4.20 - - [25/May/2025 13:47:09] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 13:47:09,903 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:09,905 - INFO - 192.168.4.20 - - [25/May/2025 13:47:09] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 13:47:10,348 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:10,349 - INFO - 192.168.4.20 - - [25/May/2025 13:47:10] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 13:47:10,800 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:10,801 - INFO - 192.168.4.20 - - [25/May/2025 13:47:10] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 13:47:26,096 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:26,108 - INFO - 192.168.4.20 - - [25/May/2025 13:47:26] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 13:47:26,727 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 13:47:26,728 - INFO - 192.168.4.20 - - [25/May/2025 13:47:26] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 13:48:25,297 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 13:48:29,903 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 13:48:29,937 - INFO - AFC remote call 1 is done.
+2025-05-25 13:48:29,939 - ERROR - Gemini study plan suggestion error: Extra data: line 80 column 1 (char 2452)
+2025-05-25 13:48:29,952 - INFO - 192.168.4.20 - - [25/May/2025 13:48:29] "POST /study_plan/init HTTP/1.1" 200 -
+2025-05-25 13:48:34,678 - INFO - 192.168.4.20 - - [25/May/2025 13:48:34] "[33mPOST /study_plan/check_goal HTTP/1.1[0m" 404 -
+2025-05-25 14:54:55,287 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 14:54:55,313 - INFO - 192.168.4.20 - - [25/May/2025 14:54:55] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 14:54:56,514 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 14:54:56,515 - INFO - 192.168.4.20 - - [25/May/2025 14:54:56] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 14:55:19,265 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 14:55:20,237 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 14:55:20,303 - INFO - AFC remote call 1 is done.
+2025-05-25 14:55:20,520 - INFO - 192.168.4.20 - - [25/May/2025 14:55:20] "POST /chat HTTP/1.1" 200 -
+2025-05-25 14:57:12,972 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 14:57:16,445 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 14:57:16,464 - INFO - AFC remote call 1 is done.
+2025-05-25 14:57:16,469 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1128)
+2025-05-25 14:57:16,486 - ERROR - Error in start_quiz: ('Cannot convert to a Firestore Value', Sentinel: Value used to set a document field to the server timestamp., 'Invalid type', <class 'google.cloud.firestore_v1.transforms.Sentinel'>)
+Traceback (most recent call last):
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py", line 99, in start_quiz_endpoint
+    quiz_data = create_quiz(user_id, subject, topic, num_questions, age, year_group, group)
+  File "/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py", line 177, in create_quiz
+    db.collection('users').document(user_id).update({
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/document.py", line 324, in update
+    batch, kwargs = self._prep_update(field_updates, option, retry, timeout)
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/base_document.py", line 248, in _prep_update
+    batch.update(self, field_updates, option=option)
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/base_batch.py", line 143, in update
+    write_pbs = _helpers.pbs_for_update(
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 955, in pbs_for_update
+    field_transform_pbs = extractor.get_field_transform_pbs(document_path)
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 629, in get_field_transform_pbs
+    + [
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 634, in <listcomp>
+    append_missing_elements=make_array_value(values),
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 605, in make_array_value
+    value_list = [encode_value(element) for element in values]
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 605, in <listcomp>
+    value_list = [encode_value(element) for element in values]
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 220, in encode_value
+    value_dict = encode_dict(value)
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 240, in encode_dict
+    return {key: encode_value(value) for key, value in values_dict.items()}
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 240, in <dictcomp>
+    return {key: encode_value(value) for key, value in values_dict.items()}
+  File "/Users/alexanyim/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/_helpers.py", line 224, in encode_value
+    raise TypeError(
+TypeError: ('Cannot convert to a Firestore Value', Sentinel: Value used to set a document field to the server timestamp., 'Invalid type', <class 'google.cloud.firestore_v1.transforms.Sentinel'>)
+2025-05-25 14:57:16,752 - INFO - 192.168.4.20 - - [25/May/2025 14:57:16] "[35m[1mPOST /start_quiz HTTP/1.1[0m" 500 -
+2025-05-25 15:02:54,347 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:02:54,905 - INFO - 192.168.4.20 - - [25/May/2025 15:02:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:02:55,851 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:02:55,856 - INFO - 192.168.4.20 - - [25/May/2025 15:02:55] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:05:06,610 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 15:05:27,946 - INFO -  * Restarting with stat
+2025-05-25 15:05:42,666 - WARNING -  * Debugger is active!
+2025-05-25 15:05:42,703 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 15:06:19,734 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 15:06:22,438 - INFO -  * Restarting with stat
+2025-05-25 15:07:21,362 - WARNING -  * Debugger is active!
+2025-05-25 15:07:21,424 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 15:07:48,991 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 15:07:52,069 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 15:07:52,109 - INFO - AFC remote call 1 is done.
+2025-05-25 15:07:52,110 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1373)
+2025-05-25 15:07:52,305 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: 8ccbc6d3-6891-4fc6-a25e-04fff1240976
+2025-05-25 15:07:52,307 - INFO - 192.168.4.20 - - [25/May/2025 15:07:52] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 15:38:24,544 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:38:24,619 - INFO - 192.168.4.20 - - [25/May/2025 15:38:24] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:38:25,947 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:38:25,949 - INFO - 192.168.4.20 - - [25/May/2025 15:38:25] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:41:26,425 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:41:26,432 - INFO - 192.168.4.20 - - [25/May/2025 15:41:26] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:41:26,801 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:41:26,802 - INFO - 192.168.4.20 - - [25/May/2025 15:41:26] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:42:17,176 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:42:17,184 - INFO - 192.168.4.20 - - [25/May/2025 15:42:17] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:42:17,577 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:42:17,578 - INFO - 192.168.4.20 - - [25/May/2025 15:42:17] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:42:35,758 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:42:35,765 - INFO - 192.168.4.20 - - [25/May/2025 15:42:35] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:42:36,125 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:42:36,127 - INFO - 192.168.4.20 - - [25/May/2025 15:42:36] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:43:41,518 - INFO - Cleared chat history for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:43:41,520 - INFO - 192.168.4.20 - - [25/May/2025 15:43:41] "POST /clear_chat HTTP/1.1" 200 -
+2025-05-25 15:44:14,566 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 15:44:15,941 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 15:44:16,002 - INFO - AFC remote call 1 is done.
+2025-05-25 15:44:16,200 - INFO - 192.168.4.20 - - [25/May/2025 15:44:16] "POST /chat HTTP/1.1" 200 -
+2025-05-25 15:44:43,186 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:44:43,191 - INFO - 192.168.4.20 - - [25/May/2025 15:44:43] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:44:43,532 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:44:43,533 - INFO - 192.168.4.20 - - [25/May/2025 15:44:43] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:45:11,696 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 15:45:14,910 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 15:45:14,917 - INFO - AFC remote call 1 is done.
+2025-05-25 15:45:14,921 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1507)
+2025-05-25 15:45:15,122 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: 6dd02775-6940-42a3-b0ae-7eecc3c78608
+2025-05-25 15:45:15,123 - INFO - 192.168.4.20 - - [25/May/2025 15:45:15] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 15:46:51,704 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:46:51,715 - INFO - 192.168.4.20 - - [25/May/2025 15:46:51] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:46:52,989 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:46:52,990 - INFO - 192.168.4.20 - - [25/May/2025 15:46:52] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:48:06,287 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:48:06,315 - INFO - 192.168.4.20 - - [25/May/2025 15:48:06] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:48:06,985 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:48:06,986 - INFO - 192.168.4.20 - - [25/May/2025 15:48:06] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:48:41,972 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:48:41,979 - INFO - 192.168.4.20 - - [25/May/2025 15:48:41] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:48:42,715 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:48:42,717 - INFO - 192.168.4.20 - - [25/May/2025 15:48:42] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:50:59,478 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:50:59,491 - INFO - 192.168.4.20 - - [25/May/2025 15:50:59] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:51:00,271 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:51:00,272 - INFO - 192.168.4.20 - - [25/May/2025 15:51:00] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:52:02,888 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:52:02,895 - INFO - 192.168.4.20 - - [25/May/2025 15:52:02] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:52:04,079 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:52:04,085 - INFO - 192.168.4.20 - - [25/May/2025 15:52:04] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:54:51,381 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 15:54:54,717 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 15:54:54,744 - INFO - AFC remote call 1 is done.
+2025-05-25 15:54:54,748 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1372)
+2025-05-25 15:54:55,077 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: 26eba152-6cce-44cb-97a9-76e3ab028e79
+2025-05-25 15:54:55,079 - INFO - 192.168.4.20 - - [25/May/2025 15:54:55] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 15:55:01,212 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:55:01,216 - INFO - 192.168.4.20 - - [25/May/2025 15:55:01] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:55:01,680 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:55:01,680 - INFO - 192.168.4.20 - - [25/May/2025 15:55:01] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:55:39,981 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:55:40,006 - INFO - 192.168.4.20 - - [25/May/2025 15:55:40] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:55:42,282 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:55:42,288 - INFO - 192.168.4.20 - - [25/May/2025 15:55:42] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:55:42,660 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:55:42,661 - INFO - 192.168.4.20 - - [25/May/2025 15:55:42] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:56:49,387 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:56:49,404 - INFO - 192.168.4.20 - - [25/May/2025 15:56:49] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 15:56:50,107 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 15:56:50,107 - INFO - 192.168.4.20 - - [25/May/2025 15:56:50] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 15:58:10,900 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 15:58:34,981 - INFO -  * Restarting with stat
+2025-05-25 15:59:00,281 - WARNING -  * Debugger is active!
+2025-05-25 15:59:00,349 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 15:59:07,098 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 15:59:10,768 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 15:59:10,802 - INFO - AFC remote call 1 is done.
+2025-05-25 15:59:10,806 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1142)
+2025-05-25 15:59:11,006 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: d449531c-9e4f-4485-b512-8e1a34e4a929
+2025-05-25 15:59:11,009 - INFO - 192.168.4.20 - - [25/May/2025 15:59:11] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 16:00:33,760 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 16:00:37,620 - INFO -  * Restarting with stat
+2025-05-25 16:00:49,129 - WARNING -  * Debugger is active!
+2025-05-25 16:00:49,152 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:00:52,172 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:00:52,175 - INFO - 192.168.4.20 - - [25/May/2025 16:00:52] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:01:00,480 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:01:00,483 - INFO - 192.168.4.20 - - [25/May/2025 16:01:00] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:01:00,831 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:01:00,831 - INFO - 192.168.4.20 - - [25/May/2025 16:01:00] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 16:10:29,330 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:10:29,390 - INFO - 192.168.4.20 - - [25/May/2025 16:10:29] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:12:16,745 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 16:12:27,780 - INFO -  * Restarting with stat
+2025-05-25 16:13:04,259 - WARNING -  * Debugger is active!
+2025-05-25 16:13:04,309 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:15:24,049 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:15:24,062 - INFO - 192.168.4.20 - - [25/May/2025 16:15:24] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:20:29,476 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 16:20:34,659 - INFO -  * Restarting with stat
+2025-05-25 16:20:53,044 - WARNING -  * Debugger is active!
+2025-05-25 16:20:53,128 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:22:05,542 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 16:22:08,640 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 16:22:08,659 - INFO - AFC remote call 1 is done.
+2025-05-25 16:22:08,660 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1726)
+2025-05-25 16:22:08,864 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: fee28f9c-1c43-4694-add1-302ce056a42a
+2025-05-25 16:22:08,868 - INFO - 192.168.4.20 - - [25/May/2025 16:22:08] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 16:22:13,452 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:22:13,456 - INFO - 192.168.4.20 - - [25/May/2025 16:22:13] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:22:51,428 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:22:51,432 - INFO - 192.168.4.20 - - [25/May/2025 16:22:51] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:22:52,770 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:22:52,775 - INFO - 192.168.4.20 - - [25/May/2025 16:22:52] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 16:24:08,256 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:24:08,262 - INFO - 192.168.4.20 - - [25/May/2025 16:24:08] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:25:45,394 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:25:45,729 - INFO - 192.168.4.20 - - [25/May/2025 16:25:45] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:31:11,175 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:31:11,524 - INFO - 192.168.4.20 - - [25/May/2025 16:31:11] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:33:21,195 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:33:21,220 - INFO - 192.168.4.20 - - [25/May/2025 16:33:21] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:33:43,611 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:33:43,643 - INFO - 192.168.4.20 - - [25/May/2025 16:33:43] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:34:06,615 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:34:06,625 - INFO - 192.168.4.20 - - [25/May/2025 16:34:06] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:34:48,774 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 16:34:58,366 - INFO -  * Restarting with stat
+2025-05-25 16:35:29,773 - WARNING -  * Debugger is active!
+2025-05-25 16:35:29,819 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:36:15,466 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 16:36:24,125 - INFO -  * Restarting with stat
+2025-05-25 16:37:04,776 - WARNING -  * Debugger is active!
+2025-05-25 16:37:04,829 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:38:24,365 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:38:24,405 - INFO - 192.168.4.20 - - [25/May/2025 16:38:24] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:39:01,894 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 16:39:01,916 - INFO - 192.168.4.20 - - [25/May/2025 16:39:01] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 16:43:56,612 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 16:44:14,310 - INFO -  * Restarting with stat
+2025-05-25 16:44:53,636 - WARNING -  * Debugger is active!
+2025-05-25 16:44:53,678 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:45:39,928 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 16:45:42,182 - INFO -  * Restarting with stat
+2025-05-25 16:46:24,597 - WARNING -  * Debugger is active!
+2025-05-25 16:46:24,658 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 16:46:54,554 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 16:46:55,674 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 16:46:55,703 - INFO - AFC remote call 1 is done.
+2025-05-25 16:46:55,704 - ERROR - Gemini flashcard generation error: Extra data: line 6 column 1 (char 160)
+2025-05-25 16:46:55,726 - INFO - 192.168.4.20 - - [25/May/2025 16:46:55] "POST /generate_flashcards/topic HTTP/1.1" 200 -
+2025-05-25 16:47:11,832 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 16:47:19,215 - INFO -  * Restarting with stat
+2025-05-25 16:47:35,754 - WARNING -  * Debugger is active!
+2025-05-25 16:47:35,841 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 17:04:13,144 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 17:04:13,174 - INFO - 192.168.4.20 - - [25/May/2025 17:04:13] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 17:04:14,146 - INFO - Cleared study topic for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 17:04:14,146 - INFO - 192.168.4.20 - - [25/May/2025 17:04:14] "POST /clear_study_topic HTTP/1.1" 200 -
+2025-05-25 17:04:42,321 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 17:04:42,781 - INFO - 192.168.4.20 - - [25/May/2025 17:04:42] "POST /chat HTTP/1.1" 200 -
+2025-05-25 17:05:16,307 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 17:05:16,812 - INFO - 192.168.4.20 - - [25/May/2025 17:05:16] "POST /chat HTTP/1.1" 200 -
+2025-05-25 17:06:14,948 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 17:06:16,317 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 17:06:16,366 - INFO - AFC remote call 1 is done.
+2025-05-25 17:06:16,572 - INFO - 192.168.4.20 - - [25/May/2025 17:06:16] "POST /chat HTTP/1.1" 200 -
+2025-05-25 17:42:01,602 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 17:42:01,649 - INFO - 192.168.4.20 - - [25/May/2025 17:42:01] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 17:42:49,691 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 17:42:49,967 - INFO - 192.168.4.20 - - [25/May/2025 17:42:49] "POST /chat HTTP/1.1" 200 -
+2025-05-25 17:46:10,068 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 17:46:13,488 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 17:46:13,542 - INFO - AFC remote call 1 is done.
+2025-05-25 17:46:13,542 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1068)
+2025-05-25 17:46:13,739 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: 339aa940-8ef6-44d8-b824-42b8ba150fcb
+2025-05-25 17:46:13,742 - INFO - 192.168.4.20 - - [25/May/2025 17:46:13] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 17:47:33,604 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 17:47:33,623 - INFO - 192.168.4.20 - - [25/May/2025 17:47:33] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 17:54:09,658 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 17:54:09,676 - INFO - 192.168.4.20 - - [25/May/2025 17:54:09] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 17:57:48,419 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 17:58:02,908 - INFO -  * Restarting with stat
+2025-05-25 17:58:17,353 - WARNING -  * Debugger is active!
+2025-05-25 17:58:17,399 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 18:56:50,148 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-25 18:56:50,150 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-25 18:56:50,156 - INFO -  * Restarting with stat
+2025-05-25 18:57:02,413 - WARNING -  * Debugger is active!
+2025-05-25 18:57:02,451 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 18:57:40,572 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 18:57:40,579 - INFO - 192.168.4.20 - - [25/May/2025 18:57:40] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 18:58:07,353 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 18:58:07,358 - INFO - 192.168.4.20 - - [25/May/2025 18:58:07] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 18:59:54,970 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 18:59:54,991 - INFO - 192.168.4.20 - - [25/May/2025 18:59:54] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:00:11,628 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:00:11,634 - INFO - 192.168.4.20 - - [25/May/2025 19:00:11] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:00:57,232 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 19:00:57,499 - INFO - 192.168.4.20 - - [25/May/2025 19:00:57] "POST /chat HTTP/1.1" 200 -
+2025-05-25 19:01:07,500 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:01:07,506 - INFO - 192.168.4.20 - - [25/May/2025 19:01:07] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:02:28,334 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:02:28,340 - INFO - 192.168.4.20 - - [25/May/2025 19:02:28] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:02:38,943 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:02:38,951 - INFO - 192.168.4.20 - - [25/May/2025 19:02:38] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:03:13,498 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:03:13,504 - INFO - 192.168.4.20 - - [25/May/2025 19:03:13] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:04:05,441 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:04:05,449 - INFO - 192.168.4.20 - - [25/May/2025 19:04:05] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:04:13,508 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 19:04:13,894 - INFO - 192.168.4.20 - - [25/May/2025 19:04:13] "POST /chat HTTP/1.1" 200 -
+2025-05-25 19:04:29,022 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:04:29,028 - INFO - 192.168.4.20 - - [25/May/2025 19:04:29] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:06:50,641 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 19:06:54,479 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 19:06:54,559 - INFO - AFC remote call 1 is done.
+2025-05-25 19:06:54,561 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1150)
+2025-05-25 19:06:54,779 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: 44ee5c1c-35da-41d0-9702-36f712b76b75
+2025-05-25 19:06:54,781 - INFO - 192.168.4.20 - - [25/May/2025 19:06:54] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 19:08:29,407 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:08:29,425 - INFO - 192.168.4.20 - - [25/May/2025 19:08:29] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:08:38,788 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:08:38,798 - INFO - 192.168.4.20 - - [25/May/2025 19:08:38] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:08:54,645 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 19:08:54,942 - INFO - 192.168.4.20 - - [25/May/2025 19:08:54] "POST /chat HTTP/1.1" 200 -
+2025-05-25 19:10:17,260 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:10:26,829 - INFO -  * Restarting with stat
+2025-05-25 19:10:45,729 - WARNING -  * Debugger is active!
+2025-05-25 19:10:45,776 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:11:31,431 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:11:36,774 - INFO -  * Restarting with stat
+2025-05-25 19:12:11,048 - WARNING -  * Debugger is active!
+2025-05-25 19:12:11,176 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:12:32,035 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:12:32,041 - INFO - 192.168.4.20 - - [25/May/2025 19:12:32] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:12:55,068 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:12:59,311 - INFO -  * Restarting with stat
+2025-05-25 19:13:19,031 - WARNING -  * Debugger is active!
+2025-05-25 19:13:19,057 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:13:57,304 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:14:09,953 - INFO -  * Restarting with stat
+2025-05-25 19:14:28,666 - WARNING -  * Debugger is active!
+2025-05-25 19:14:28,718 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:14:32,251 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:14:32,253 - INFO - 192.168.4.20 - - [25/May/2025 19:14:32] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:14:55,307 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:14:58,771 - INFO -  * Restarting with stat
+2025-05-25 19:15:26,663 - WARNING -  * Debugger is active!
+2025-05-25 19:15:26,742 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:15:59,774 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:16:01,101 - INFO -  * Restarting with stat
+2025-05-25 19:16:16,024 - WARNING -  * Debugger is active!
+2025-05-25 19:16:16,050 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:16:55,234 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/quiz.py', reloading
+2025-05-25 19:16:58,276 - INFO -  * Restarting with stat
+2025-05-25 19:17:11,924 - WARNING -  * Debugger is active!
+2025-05-25 19:17:11,957 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:27:04,967 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:27:04,995 - INFO - 192.168.4.20 - - [25/May/2025 19:27:04] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:53:18,383 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:53:18,418 - INFO - 192.168.4.20 - - [25/May/2025 19:53:18] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 19:53:59,735 - INFO - Selected topic for general quiz: subject=Science, topic=Environment
+2025-05-25 19:53:59,738 - INFO - Attempting to create quiz for user TUac4TwShbdxy8ODV7zBFANZNNL2, Subject: Science, Topic: Environment, Difficulty: determined based on mastery, Year Group: General, Num Questions: 5
+2025-05-25 19:54:01,306 - INFO - Fetched 0 questions from study material for topic Environment.
+2025-05-25 19:54:01,307 - INFO - Need 5 more questions. Attempting to generate with Gemini.
+2025-05-25 19:54:01,802 - INFO - AFC is enabled with max remote calls: 10.
+2025-05-25 19:54:05,453 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-05-25 19:54:05,606 - INFO - AFC remote call 1 is done.
+2025-05-25 19:54:05,607 - ERROR - Gemini question generation error: Extra data: line 33 column 1 (char 1718)
+2025-05-25 19:54:05,622 - WARNING - Gemini did not generate any questions.
+2025-05-25 19:54:05,623 - INFO - Total questions collected for quiz: 0
+2025-05-25 19:54:05,982 - INFO - Started quiz for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2, quiz_id: bf77258f-9a08-443b-b55a-3bae82b009b3
+2025-05-25 19:54:06,000 - INFO - 192.168.4.20 - - [25/May/2025 19:54:06] "POST /start_quiz HTTP/1.1" 200 -
+2025-05-25 19:54:18,654 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 19:54:27,287 - INFO -  * Restarting with stat
+2025-05-25 19:55:48,409 - WARNING -  * Debugger is active!
+2025-05-25 19:55:48,604 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 19:56:29,447 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 19:56:29,464 - INFO - 192.168.4.20 - - [25/May/2025 19:56:29] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 20:02:22,371 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/resources.py', reloading
+2025-05-25 20:02:30,585 - INFO -  * Restarting with stat
+2025-05-25 20:03:01,885 - WARNING -  * Debugger is active!
+2025-05-25 20:03:01,934 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:03:58,238 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/resources.py', reloading
+2025-05-25 20:03:59,756 - INFO -  * Restarting with stat
+2025-05-25 20:04:21,779 - WARNING -  * Debugger is active!
+2025-05-25 20:04:21,868 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:04:39,086 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:04:41,691 - INFO -  * Restarting with stat
+2025-05-25 20:05:08,562 - WARNING -  * Debugger is active!
+2025-05-25 20:05:08,684 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:05:28,203 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:05:29,389 - INFO -  * Restarting with stat
+2025-05-25 20:05:43,268 - WARNING -  * Debugger is active!
+2025-05-25 20:05:43,289 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:05:59,224 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:06:02,444 - INFO -  * Restarting with stat
+2025-05-25 20:06:27,055 - WARNING -  * Debugger is active!
+2025-05-25 20:06:27,091 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:06:55,685 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/resources.py', reloading
+2025-05-25 20:06:56,570 - INFO -  * Restarting with stat
+2025-05-25 20:07:09,178 - WARNING -  * Debugger is active!
+2025-05-25 20:07:09,205 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:07:54,753 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:07:55,592 - INFO -  * Restarting with stat
+2025-05-25 20:08:08,984 - WARNING -  * Debugger is active!
+2025-05-25 20:08:09,014 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:08:55,431 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:08:56,272 - INFO -  * Restarting with stat
+2025-05-25 20:09:07,055 - WARNING -  * Debugger is active!
+2025-05-25 20:09:07,081 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:09:55,063 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/resources.py', reloading
+2025-05-25 20:09:55,688 - INFO -  * Restarting with stat
+2025-05-25 20:10:06,563 - WARNING -  * Debugger is active!
+2025-05-25 20:10:06,593 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 20:10:53,520 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading
+2025-05-25 20:10:54,192 - INFO -  * Restarting with stat
+2025-05-25 22:22:03,828 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.4.47:5000
+2025-05-25 22:22:03,831 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-25 22:22:03,841 - INFO -  * Restarting with stat
+2025-05-25 22:22:53,610 - WARNING -  * Debugger is active!
+2025-05-25 22:22:53,677 - INFO -  * Debugger PIN: 461-607-501
+2025-05-25 22:23:02,592 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:23:02,598 - INFO - 192.168.4.20 - - [25/May/2025 22:23:02] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:23:03,037 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:23:03,041 - INFO - 192.168.4.20 - - [25/May/2025 22:23:03] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:26:12,542 - ERROR - Gemini Response Error for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2: sequence item 0: expected str instance, dict found
+2025-05-25 22:26:12,785 - INFO - 192.168.4.20 - - [25/May/2025 22:26:12] "POST /chat HTTP/1.1" 200 -
+2025-05-25 22:27:24,435 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:27:24,474 - INFO - 192.168.4.20 - - [25/May/2025 22:27:24] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:29:09,939 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:29:10,031 - INFO - 192.168.4.20 - - [25/May/2025 22:29:10] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:33:08,043 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:33:08,071 - INFO - 192.168.4.20 - - [25/May/2025 22:33:08] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:33:22,893 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:33:22,900 - INFO - 192.168.4.20 - - [25/May/2025 22:33:22] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:38:05,396 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:38:05,412 - INFO - 192.168.4.20 - - [25/May/2025 22:38:05] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:38:13,574 - INFO - Fetched user data for user_id: TUac4TwShbdxy8ODV7zBFANZNNL2
+2025-05-25 22:38:13,579 - INFO - 192.168.4.20 - - [25/May/2025 22:38:13] "POST /get_user_data HTTP/1.1" 200 -
+2025-05-25 22:44:21,085 - INFO -  * Detected change in '/Users/alexanyim/cursor(code)/StudyBuddy-backend/main.py', reloading

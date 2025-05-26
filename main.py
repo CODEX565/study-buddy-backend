@@ -1,934 +1,784 @@
-import logging
+import os
 from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
+from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
-from Max import generate_gemini_response, process_image_with_gemini, process_document_with_gemini, process_pdf, process_docx, process_text_file, generate_image
-from Quiz import generate_quiz_question, check_answer, get_user_data, save_quiz_score, generate_full_quiz, evaluate_quiz, save_to_exam_mode
-from exam import generate_full_exam, start_exam_attempt, submit_exam_answers, evaluate_exam, generate_summary, generate_flashcards, generate_total_summary
-from flashcards import generate_flashcards_from_quiz, generate_flashcards_from_document, generate_flashcards_from_input, get_user_flashcards, update_flashcard_status
-from gemini_image_processor import image_processor_bp
-import os
-import uuid
-import json
-import random
-from werkzeug.utils import secure_filename
+import logging
 from datetime import datetime
-import google.generativeai as genai
-from google.generativeai import types
-from chat import chat_bp, socketio
+import base64
+import re
+from io import BytesIO
+from PIL import Image
+from werkzeug.utils import secure_filename
+from quiz import create_quiz, submit_quiz, get_user_data
+from flashcards import generate_flashcards_for_failed_topics, generate_flashcards_for_topic
+from exam import create_exam, submit_exam
+from max import (
+    generate_gemini_response, get_user_data, process_image_with_gemini, 
+    process_document_with_gemini, process_user_input, generate_image,
+    process_pdf, process_docx
+)
+from study_plan import initialize_study_plan, log_daily_study
 
+# File upload configuration
+UPLOAD_FOLDER = 'Uploads'
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def save_conversation_history(user_id, conversation_history):
+    """Save the conversation history for a user in Firestore."""
+    db.collection('users').document(user_id).update({
+        "ai_conversation_history": conversation_history
+    })
+
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('studybuddy.log'),
+        logging.FileHandler('app.log'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
+# Initialize Flask app
 app = Flask(__name__)
-app.register_blueprint(image_processor_bp)
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-app.register_blueprint(chat_bp)
-socketio.init_app(app, cors_allowed_origins="*")
+# Load environment variables
+load_dotenv()
 
+# Initialize Firestore
 if not firebase_admin._apps:
     cred = credentials.Certificate('studybuddy.json')
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-UPLOAD_FOLDER = 'Uploads'
-ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-client = genai.GenerativeModel('gemini-1.5-flash')
-
-# SocketIO event handlers for chat functionality
-@socketio.on('connect')
-def handle_connect():
-    logger.info(f"Client connected: {request.sid}")
-    emit('connected', {'message': 'Connected to Study Buddy server'})
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    logger.info(f"Client disconnected: {request.sid}")
-
-@socketio.on('join_chat')
-def handle_join_chat(data):
-    chat_id = data.get('chat_id')
-    user_id = data.get('user_id')
-    if not chat_id or not user_id:
-        logger.error(f"Missing chat_id or user_id in join_chat: {data}")
-        emit('error', {'error': 'chat_id and user_id are required'})
-        return
-    logger.info(f"User {user_id} joining chat {chat_id}")
-    chat_doc = db.collection('chats').document(chat_id).get()
-    if not chat_doc.exists:
-        logger.warning(f"Chat not found: {chat_id}")
-        emit('error', {'error': 'Chat not found'})
-        return
-    from flask_socketio import join_room
-    join_room(chat_id)
-    emit('joined_chat', {'message': f'Joined chat {chat_id}'}, room=chat_id)
-
-@socketio.on('new_message')
-def handle_new_message(data):
-    chat_id = data.get('chat_id')
-    user_id = data.get('user_id')
-    text = data.get('text')
-    resource_url = data.get('resource_url')
-    resource_name = data.get('resource_name')
-    if not chat_id or not user_id or (not text and not resource_url):
-        logger.error(f"Invalid new_message data: {data}")
-        emit('error', {'error': 'chat_id, user_id, and either text or resource_url are required'})
-        return
-    logger.info(f"New message in chat {chat_id} from user {user_id}")
-    message_data = {
-        'sender_id': user_id,
-        'text': text or '',
-        'resource_url': resource_url or None,
-        'resource_name': resource_name or None,
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
-    db.collection('chats').document(chat_id).collection('messages').add(message_data)
-    emit('new_message', message_data, room=chat_id)
-
-# New endpoint to fetch chats for a user
-@app.route('/get_chats', methods=['POST'])
-def get_chats():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in get_chats request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        if not user_id:
-            logger.error("Missing user_id in get_chats request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Fetching chats for user_id: {user_id}")
-        chats_ref = db.collection('chats').where('participants', 'array_contains', user_id)
-        chats = chats_ref.stream()
-        chat_list = []
-        for chat in chats:
-            chat_data = chat.to_dict()
-            chat_list.append({
-                'chat_id': chat.id,
-                'title': chat_data.get('title', 'Untitled Chat'),
-                'isGroup': chat_data.get('isGroup', False),
-                'participants': chat_data.get('participants', []),
-                'createdAt': chat_data.get('createdAt')
-            })
-        logger.debug(f"Fetched {len(chat_list)} chats for user_id: {user_id}")
-        return jsonify({'chats': chat_list}), 200
-    except Exception as e:
-        logger.exception(f"Get chats error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-# New endpoint for sending messages
-@app.route('/send_message', methods=['POST'])
-def send_message():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in send_message request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        chat_id = data.get('chat_id')
-        user_id = data.get('user_id')
-        text = data.get('text')
-        if not chat_id or not user_id or not text:
-            logger.error(f"Missing required fields: chat_id={chat_id}, user_id={user_id}, text={text}")
-            return jsonify({'error': 'chat_id, user_id, and text are required'}), 400
-        logger.info(f"Sending message in chat {chat_id} by user {user_id}")
-        chat_doc = db.collection('chats').document(chat_id).get()
-        if not chat_doc.exists:
-            logger.warning(f"Chat not found: {chat_id}")
-            return jsonify({'error': 'Chat not found'}), 404
-        message_data = {
-            'sender_id': user_id,
-            'text': text,
-            'resource_url': None,
-            'resource_name': None,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        db.collection('chats').document(chat_id).collection('messages').add(message_data)
-        socketio.emit('new_message', message_data, room=chat_id)
-        logger.debug(f"Message sent successfully in chat {chat_id}")
-        return jsonify({'message': 'Message sent successfully'}), 200
-    except Exception as e:
-        logger.exception(f"Send message error: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-# New endpoint for sharing resources
-@app.route('/share_resource', methods=['POST'])
-def share_resource():
-    try:
-        if 'file' not in request.files:
-            logger.error("No file provided in share_resource request")
-            return jsonify({'error': 'No file provided'}), 400
-        file = request.files['file']
-        chat_id = request.form.get('chat_id')
-        user_id = request.form.get('user_id')
-        if not file or not chat_id or not user_id or file.filename == '':
-            logger.error(f"Missing required fields: chat_id={chat_id}, user_id={user_id}, file={'provided' if file else 'missing'}")
-            return jsonify({'error': 'File, chat_id, and user_id are required'}), 400
-        if not allowed_file(file.filename):
-            logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'File type not allowed. Use pdf, docx, txt, png, jpg, or jpeg'}), 400
-        logger.info(f"Sharing resource in chat {chat_id} by user {user_id}, file: {file.filename}")
-        chat_doc = db.collection('chats').document(chat_id).get()
-        if not chat_doc.exists:
-            logger.warning(f"Chat not found: {chat_id}")
-            return jsonify({'error': 'Chat not found'}), 404
-        filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4()}_{filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        file.save(file_path)
-        # Store file in Firestore Storage (simplified; replace with actual Firebase Storage upload)
-        resource_url = f"uploads/{unique_filename}"  # Placeholder; update with actual storage URL
-        message_data = {
-            'sender_id': user_id,
-            'text': '',
-            'resource_url': resource_url,
-            'resource_name': filename,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        db.collection('chats').document(chat_id).collection('messages').add(message_data)
-        socketio.emit('new_message', message_data, room=chat_id)
-        logger.debug(f"Resource shared successfully in chat {chat_id}")
-        return jsonify({'message': 'Resource shared successfully', 'resource_url': resource_url}), 200
-    except Exception as e:
-        logger.exception(f"Share resource error: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/', methods=['GET'])
-def index():
-    logger.info(f"GET / request: headers={request.headers}, args={request.args}, remote_addr={request.remote_addr}")
-    return jsonify({
-        'status': 'Study Buddy backend running',
-        'message': 'Use POST to /chat, /generate_quiz, /generate_full_exam, /start_exam, /submit_exam, /evaluate_exam, /get_summary, /generate_flashcards, /get_total_summary, /process_document, etc.'
-    }), 200
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in chat request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_input = data.get('user_input')
-        user_id = data.get('user_id')
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
-        if not user_input or not user_id:
-            logger.error(f"Missing required fields: user_input={user_input}, user_id={user_id}")
-            return jsonify({'error': 'user_input and user_id are required'}), 400
-        logger.info(f"Processing chat for user_id: {user_id}, input: {user_input}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        conversation_history = user_data.get('conversation_history', [])
-        response = generate_gemini_response(user_data, user_input, conversation_history, user_id, latitude=latitude, longitude=longitude)
-        image_tag = None
-        if isinstance(response, tuple):
-            response, image_tag = response
-        elif response.startswith('[GENERATE_IMAGE:'):
-            image_tag = response
-            response = "Here’s the image you requested!"
-        if image_tag and image_tag.startswith('[GENERATE_IMAGE:'):
-            image_prompt = image_tag[len('[GENERATE_IMAGE:'):-1].strip()
-            logger.info(f"Generating image for prompt: {image_prompt}")
-            image_base64 = generate_image(image_prompt)
-            if image_base64:
-                response_data = {'response': response, 'image_base64': image_base64}
-            else:
-                logger.error(f"Failed to generate image for prompt: {image_prompt}")
-                response_data = {'response': 'Sorry, I couldn’t generate the image. Try again? 😅'}
-        else:
-            response_data = {'response': response}
-        conversation_history.append({'user': user_input, 'max': response_data['response']})
-        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
-        logger.debug(f"Updated conversation history for user_id: {user_id}")
-        return jsonify(response_data), 200
-    except Exception as e:
-        logger.exception(f"Chat error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/process_image', methods=['POST'])
-def process_image():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in process_image request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_input = data.get('user_input')
-        user_id = data.get('user_id')
-        image_base64 = data.get('image_base64')
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
-        if not user_input or not user_id or not image_base64:
-            logger.error(f"Missing required fields: user_input={user_input}, user_id={user_id}, image_base64={'provided' if image_base64 else 'missing'}")
-            return jsonify({'error': 'user_input, user_id, and image_base64 are required'}), 400
-        logger.info(f"Processing image for user_id: {user_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        conversation_history = user_data.get('conversation_history', [])
-        response = process_image_with_gemini(user_input, image_base64, conversation_history, user_data.get('memories', []), user_id, mime_type="image/png", latitude=latitude, longitude=longitude)
-        conversation_history.append({'user': user_input, 'max': response})
-        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
-        logger.debug(f"Updated conversation history for user_id: {user_id}")
-        return jsonify({'response': response}), 200
-    except Exception as e:
-        logger.exception(f"Process image error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/process_document', methods=['POST'])
-def process_document():
-    try:
-        if 'file' not in request.files:
-            logger.error("No file provided in process_document request")
-            return jsonify({'error': 'No file provided'}), 400
-        file = request.files['file']
-        user_id = request.form.get('user_id')
-        user_input = request.form.get('user_input', '')
-        latitude = request.form.get('latitude')
-        longitude = request.form.get('longitude')
-        if not file or not user_id or file.filename == '':
-            logger.error(f"Missing required fields: user_id={user_id}, file={'provided' if file else 'missing'}")
-            return jsonify({'error': 'File and user_id are required'}), 400
-        if not allowed_file(file.filename):
-            logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'File type not allowed. Use pdf, docx, or txt'}), 400
-        logger.info(f"Processing document for user_id: {user_id}, file: {file.filename}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        if filename.endswith('.pdf'):
-            document_text = process_pdf(file_path)
-        elif filename.endswith('.docx'):
-            document_text = process_docx(file_path)
-        elif filename.endswith('.txt'):
-            document_text = process_text_file(file_path)
-        else:
-            os.remove(file_path)
-            logger.error(f"Unsupported file type: {filename}")
-            return jsonify({'error': 'Unsupported file type'}), 400
-        os.remove(file_path)
-        if not document_text:
-            logger.error(f"Failed to process document: {filename}")
-            return jsonify({'error': 'Failed to process document'}), 500
-        conversation_history = user_data.get('conversation_history', [])
-        response = process_document_with_gemini(user_id, document_text, user_input, conversation_history, user_data.get('memories', []), latitude=latitude, longitude=longitude)
-        conversation_history.append({'user': user_input, 'max': response})
-        db.collection('users').document(user_id).update({'conversation_history': conversation_history})
-        logger.debug(f"Updated conversation history for user_id: {user_id}")
-        return jsonify({'response': response}), 200
-    except Exception as e:
-        logger.exception(f"Process document error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/clear_chat', methods=['POST'])
-def clear_chat():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in clear_chat request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        if not user_id:
-            logger.error("Missing user_id in clear_chat request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Clearing chat history for user_id: {user_id}")
-        user_ref = db.collection('users').document(user_id)
-        user_ref.update({'conversation_history': []})
-        logger.debug(f" Streaks cleared for user_id: {user_id}")
-        return jsonify({'message': 'Chat history cleared successfully'}), 200
-    except Exception as e:
-        logger.exception(f"Clear chat error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Failed to clear chat history: {str(e)}'}), 500
-
 @app.route('/get_user_data', methods=['POST'])
 def get_user_data_endpoint():
+    """Fetch user data for quiz setup."""
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in get_user_data request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
         if not user_id:
-            logger.error("Missing user_id in get_user_data request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Fetching user data for user_id: {user_id}")
-        user_doc = db.collection('users').document(user_id).get()
-        if not user_doc.exists:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        user_data = user_doc.to_dict()
-        response_data = {
-            'age': user_data.get('age'),
-            'year_group': user_data.get('year_group'),
-            'study_topic': user_data.get('study_topic'),
-            'display_name': user_data.get('display_name')
-        }
-        logger.debug(f"Fetched user data for user_id: {user_id}: {response_data}")
-        return jsonify(response_data), 200
-    except Exception as e:
-        logger.exception(f"Get user data error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Failed to fetch user data: {str(e)}'}), 500
-
-@app.route('/set_display_name', methods=['POST'])
-def set_display_name():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in set_display_name request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        display_name = data.get('display_name')
-        if not user_id or not display_name:
-            logger.error(f"Missing required fields: user_id={user_id}, display_name={display_name}")
-            return jsonify({'error': 'user_id and display_name are required'}), 400
-        if len(display_name.strip()) < 2:
-            logger.error(f"Invalid display_name: {display_name}")
-            return jsonify({'error': 'Display name must be at least 2 characters'}), 400
-        logger.info(f"Setting display name for user_id: {user_id}, display_name: {display_name}")
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        user_ref.update({'display_name': display_name.strip()})
-        logger.debug(f"Display name set for user_id: {user_id}")
-        return jsonify({'message': 'Display name set successfully'}), 200
-    except Exception as e:
-        logger.exception(f"Set display name error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Failed to set display name: {str(e)}'}), 500
-
-@app.route('/clear_study_topic', methods=['POST'])
-def clear_study_topic():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in clear_study_topic request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        if not user_id:
-            logger.error("Missing user_id in clear_study_topic request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Clearing study topic for user_id: {user_id}")
-        user_ref = db.collection('users').document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        user_ref.update({'study_topic': firestore.DELETE_FIELD})
-        logger.debug(f"Study topic cleared for user_id: {user_id}")
-        return jsonify({'message': 'Study topic cleared successfully'}), 200
-    except Exception as e:
-        logger.exception(f"Clear study topic error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Failed to clear study topic: {str(e)}'}), 500
-
-@app.route('/generate_quiz', methods=['POST'])
-def generate_quiz():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_quiz request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        topic = data.get('topic')
-        age = data.get('age')
-        year_group = data.get('year_group')
-        if not user_id:
-            logger.error("Missing user_id in generate_quiz request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Generating quiz for user_id: {user_id}, topic: {topic}, age: {age}, year_group: {year_group}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+        user_data = get_user_data(user_id)
         if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        quiz_data = generate_quiz_question(db, user_id, topic, age, year_group)
-        logger.debug(f"Quiz response for user_id: {user_id}: {quiz_data}")
-        if 'error' in quiz_data:
-            logger.error(f"Quiz generation error: {quiz_data['error']}")
-            return jsonify({'error': quiz_data['error']}), 500
-        return jsonify(quiz_data), 200
+            logger.warning(f"User data fetch failed for user_id: {user_id}")
+            return jsonify({"error": "User not found"}), 404
+        logger.info(f"Fetched user data for user_id: {user_id}")
+        return jsonify(user_data), 200
     except Exception as e:
-        logger.exception(f"Generate quiz error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in get_user_data: {e}")
+        return jsonify({"error": "Server error"}), 500
 
-@app.route('/generate_full_quiz', methods=['POST'])
-def generate_full_quiz_endpoint():
+@app.route('/start_quiz', methods=['POST'])
+def start_quiz_endpoint():
+    """Start a new quiz session."""
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_full_quiz request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
+        subject = data.get('subject')
         topic = data.get('topic')
-        question_count = data.get('question_count')
+        num_questions = data.get('num_questions', 10)
         age = data.get('age')
         year_group = data.get('year_group')
         group = data.get('group')
-        if not user_id or not question_count:
-            logger.error(f"Missing required fields: user_id={user_id}, question_count={question_count}")
-            return jsonify({'error': 'user_id and question_count are required'}), 400
-        if not isinstance(question_count, int) or question_count <= 0:
-            logger.error(f"Invalid question_count: {question_count}")
-            return jsonify({'error': 'question_count must be a positive integer'}), 400
-        logger.info(f"Generating full quiz for user_id: {user_id}, topic: {topic}, question_count: {question_count}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        quiz_data = generate_full_quiz(db, user_id, topic, question_count, age, year_group, group)
-        logger.debug(f"Full quiz response for user_id: {user_id}: {quiz_data}")
-        if 'error' in quiz_data:
-            logger.error(f"Full quiz generation error: {quiz_data['error']}")
-            return jsonify({'error': quiz_data['error']}), 500
+
+        if not user_id or not subject or not topic:
+            logger.error("Missing required fields: user_id, subject, or topic")
+            return jsonify({"error": "Missing required fields"}), 400
+
+        quiz_data = create_quiz(user_id, subject, topic, num_questions, age, year_group, group)
+        if "error" in quiz_data:
+            logger.error(f"Quiz start failed: {quiz_data['error']}")
+            return jsonify(quiz_data), 400
+
+        logger.info(f"Started quiz for user_id: {user_id}, quiz_id: {quiz_data['quiz_id']}")
         return jsonify(quiz_data), 200
     except Exception as e:
-        logger.exception(f"Generate full quiz error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in start_quiz: {e}")
+        return jsonify({"error": "Server error"}), 500
 
-@app.route('/check_answer', methods=['POST'])
-def check_answer_endpoint():
+@app.route('/submit_quiz', methods=['POST'])
+def submit_quiz_endpoint():
+    """Submit quiz answers and get results."""
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in check_answer request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        question_id = data.get('question_id')
-        user_answer = data.get('user_answer')
-        if not user_id or not question_id or not user_answer:
-            logger.error(f"Missing required fields: user_id={user_id}, question_id={question_id}, user_answer={user_answer}")
-            return jsonify({'error': 'user_id, question_id, and user_answer are required'}), 400
-        logger.info(f"Checking answer for user_id: {user_id}, question_id: {question_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        result = check_answer(db, user_id, question_id, user_answer)
-        logger.debug(f"Check answer response for user_id: {user_id}: {result}")
-        if 'error' in result:
-            logger.error(f"Check answer error: {result['error']}")
-            return jsonify({'error': result['error']}), 404
-        return jsonify(result), 200
-    except Exception as e:
-        logger.exception(f"Check answer error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/evaluate_quiz', methods=['POST'])
-def evaluate_quiz_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in evaluate_quiz request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
         quiz_id = data.get('quiz_id')
-        if not user_id or not quiz_id:
-            logger.error(f"Missing required fields: user_id={user_id}, quiz_id={quiz_id}")
-            return jsonify({'error': 'user_id and quiz_id are required'}), 400
-        logger.info(f"Evaluating quiz for user_id: {user_id}, quiz_id: {quiz_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        result = evaluate_quiz(db, user_id, quiz_id)
-        logger.debug(f"Evaluate quiz response for user_id: {user_id}: {result}")
-        if 'error' in result:
-            logger.error(f"Evaluate quiz error: {result['error']}")
-            return jsonify({'error': result['error']}), 500
+        responses = data.get('responses')
+
+        if not user_id or not quiz_id or not responses:
+            logger.error("Missing required fields: user_id, quiz_id, or responses")
+            return jsonify({"error": "Missing required fields"}), 400
+
+        result = submit_quiz(user_id, quiz_id, responses)
+        if "error" in result:
+            logger.error(f"Quiz submission failed: {result['error']}")
+            return jsonify(result), 400
+
+        logger.info(f"Quiz submitted for user_id: {user_id}, quiz_id: {quiz_id}, score: {result['score']}")
         return jsonify(result), 200
     except Exception as e:
-        logger.exception(f"Evaluate quiz error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/generate_full_exam', methods=['POST'])
-def generate_full_exam_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_full_exam request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        topic = data.get('topic')
-        question_count = data.get('question_count', 10)
-        age = data.get('age')
-        year_group = data.get('year_group')
-        if not user_id:
-            logger.error("Missing user_id in generate_full_exam request")
-            return jsonify({'error': 'user_id is required'}), 400
-        if not isinstance(question_count, int) or question_count <= 0:
-            logger.error(f"Invalid question_count: {question_count}")
-            return jsonify({'error': 'question_count must be a positive integer'}), 400
-        logger.info(f"Generating full exam for user_id: {user_id}, topic: {topic}, question_count: {question_count}, age: {age}, year_group: {year_group}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        exam_data = generate_full_exam(db, user_id, topic, question_count, age, year_group)
-        logger.debug(f"Full exam response for user_id: {user_id}: {exam_data}")
-        if 'error' in exam_data:
-            logger.error(f"Full exam generation error: {exam_data['error']}")
-            return jsonify({'error': exam_data['error']}), 500
-        return jsonify(exam_data), 200
-    except Exception as e:
-        logger.exception(f"Generate full exam error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/start_exam', methods=['POST'])
-def start_exam_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in start_exam request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        exam_id = data.get('exam_id')
-        if not user_id or not exam_id:
-            logger.error(f"Missing required fields: user_id={user_id}, exam_id={exam_id}")
-            return jsonify({'error': 'user_id and exam_id are required'}), 400
-        logger.info(f"Starting exam for user_id: {user_id}, exam_id: {exam_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        result = start_exam_attempt(db, user_id, exam_id)
-        logger.debug(f"Start exam response for user_id: {user_id}: {result}")
-        if 'error' in result:
-            logger.error(f"Start exam error: {result['error']}")
-            return jsonify({'error': result['error']}), 500
-        return jsonify(result), 200
-    except Exception as e:
-        logger.exception(f"Start exam error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/submit_exam', methods=['POST'])
-def submit_exam_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in submit_exam request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        exam_id = data.get('exam_id')
-        answers = data.get('answers')
-        if not user_id or not exam_id or not answers:
-            logger.error(f"Missing required fields: user_id={user_id}, exam_id={exam_id}, answers={'provided' if answers else 'missing'}")
-            return jsonify({'error': 'user_id, exam_id, and answers are required'}), 400
-        if not isinstance(answers, dict):
-            logger.error(f"Invalid answers format: {answers}")
-            return jsonify({'error': 'answers must be a dictionary'}), 400
-        logger.info(f"Submitting exam for user_id: {user_id}, exam_id: {exam_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        result = submit_exam_answers(db, user_id, exam_id, answers)
-        logger.debug(f"Submit exam response for user_id: {user_id}: {result}")
-        if 'error' in result:
-            logger.error(f"Submit exam error: {result['error']}")
-            return jsonify({'error': result['error']}), 500
-        return jsonify(result), 200
-    except Exception as e:
-        logger.exception(f"Submit exam error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/evaluate_exam', methods=['POST'])
-def evaluate_exam_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in evaluate_exam request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        exam_id = data.get('exam_id')
-        if not user_id or not exam_id:
-            logger.error(f"Missing required fields: user_id={user_id}, exam_id={exam_id}")
-            return jsonify({'error': 'user_id and exam_id are required'}), 400
-        logger.info(f"Evaluating exam for user_id: {user_id}, exam_id: {exam_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        result = evaluate_exam(db, user_id, exam_id)
-        logger.debug(f"Evaluate exam response for user_id: {user_id}: {result}")
-        if 'error' in result:
-            logger.error(f"Evaluate exam error: {result['error']}")
-            return jsonify({'error': result['error']}), 500
-        return jsonify(result), 200
-    except Exception as e:
-        logger.exception(f"Evaluate exam error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/get_summary', methods=['POST'])
-def get_summary_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in get_summary request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        quiz_or_exam_id = data.get('quiz_or_exam_id')
-        is_exam = data.get('is_exam', False)
-        if not user_id or not quiz_or_exam_id:
-            logger.error(f"Missing required fields: user_id={user_id}, quiz_or_exam_id={quiz_or_exam_id}")
-            return jsonify({'error': 'user_id and quiz_or_exam_id are required'}), 400
-        logger.info(f"Generating summary for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        summary = generate_summary(db, user_id, quiz_or_exam_id, is_exam)
-        logger.debug(f"Summary response for user_id: {user_id}: {summary}")
-        if 'error' in summary:
-            logger.error(f"Generate summary error: {summary['error']}")
-            return jsonify({'error': summary['error']}), 500
-        return jsonify(summary), 200
-    except Exception as e:
-        logger.exception(f"Generate summary error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/get_total_summary', methods=['POST'])
-def get_total_summary_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in get_total_summary request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        if not user_id:
-            logger.error("Missing user_id in get_total_summary request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Generating total summary for user_id: {user_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        summary = generate_total_summary(db, user_id)
-        logger.debug(f"Total summary response for user_id: {user_id}: {summary}")
-        if 'error' in summary:
-            logger.error(f"Generate total summary error: {summary['error']}")
-            return jsonify({'error': summary['error']}), 500
-        return jsonify(summary), 200
-    except Exception as e:
-        logger.exception(f"Generate total summary error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in submit_quiz: {e}")
+        return jsonify({"error": "Server error"}), 500
 
 @app.route('/generate_flashcards', methods=['POST'])
 def generate_flashcards_endpoint():
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_flashcards request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
-        quiz_or_exam_id = data.get('quiz_or_exam_id')
-        is_exam = data.get('is_exam', False)
-        if not user_id or not quiz_or_exam_id:
-            logger.error(f"Missing required fields: user_id={user_id}, quiz_or_exam_id={quiz_or_exam_id}")
-            return jsonify({'error': 'user_id and quiz_or_exam_id are required'}), 400
-        logger.info(f"Generating flashcards for user_id: {user_id}, {'exam' if is_exam else 'quiz'}_id: {quiz_or_exam_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        flashcards = generate_flashcards(db, user_id, quiz_or_exam_id, is_exam)
-        logger.debug(f"Flashcards response for user_id: {user_id}: {flashcards}")
-        if 'error' in flashcards:
-            logger.error(f"Generate flashcards error: {flashcards['error']}")
-            return jsonify({'error': flashcards['error']}), 500
-        return jsonify(flashcards), 200
-    except Exception as e:
-        logger.exception(f"Generate flashcards error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/save_quiz_score', methods=['POST'])
-def save_quiz_score_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in save_quiz_score request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        score = data.get('score')
-        total_questions = data.get('total_questions')
-        topic = data.get('topic', 'General')
-        year_group = data.get('year_group', 'General')
-        results = data.get('results', [])
-        quiz_id = data.get('quiz_id')
-        if not user_id or score is None or total_questions is None:
-            logger.error(f"Missing required fields: user_id={user_id}, score={score}, total_questions={total_questions}")
-            return jsonify({'error': 'user_id, score, and total_questions are required'}), 400
-        logger.info(f"Saving quiz score for user_id: {user_id}, score: {score}/{total_questions}, topic: {topic}, year_group: {year_group}, quiz_id: {quiz_id}")
-        user_data = db.collection('users').document(user_id).get().to_dict()
-        if not user_data:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        save_quiz_score(db, user_id, score, total_questions, topic, year_group, results, quiz_id=quiz_id)
-        logger.debug(f"Saved quiz score for user_id: {user_id}")
-        return jsonify({'message': 'Quiz score saved successfully'}), 200
-    except Exception as e:
-        logger.exception(f"Save quiz score error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Failed to save quiz score: {str(e)}'}), 500
-
-@app.route('/generate_flashcards_from_quiz', methods=['POST'])
-def generate_flashcards_from_quiz_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_flashcards_from_quiz request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        topic = data.get('topic')
         if not user_id:
-            logger.error("Missing user_id in generate_flashcards_from_quiz request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Generating flashcards from quiz for user_id: {user_id}, topic: {topic}")
-        user_ref = db.collection('users').document(user_id)
-        if not user_ref.get().exists:
-            logger.warning(f"User not found: {user_id}")
-            return jsonify({'error': 'User not found'}), 404
-        flashcards = generate_flashcards_from_quiz(db, user_id, topic)
-        if not flashcards:
-            logger.warning(f"No flashcards generated for user_id: {user_id}")
-            return jsonify({'message': 'No flashcards generated. Try a different topic or take more quizzes.'}), 200
-        return jsonify({'flashcards': flashcards}), 200
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+        flashcards = generate_flashcards_for_failed_topics(user_id)
+        logger.info(f"Generated flashcards for user_id: {user_id}, count: {len(flashcards)}")
+        return jsonify({"flashcards": flashcards}), 200
     except Exception as e:
-        logger.exception(f"Generate flashcards from quiz error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in generate_flashcards: {e}")
+        return jsonify({"error": "Server error"}), 500
 
-@app.route('/generate_flashcards_from_document', methods=['POST'])
-def generate_flashcards_from_document_endpoint():
-    try:
-        if 'file' not in request.files:
-            logger.error("No file provided in generate_flashcards_from_document request")
-            return jsonify({'error': 'No file provided'}), 400
-        file = request.files['file']
-        user_id = request.form.get('user_id')
-        topic = request.form.get('topic', 'General')
-        user_input = request.form.get('user_input', '')
-        if not file or not user_id or file.filename == '':
-            logger.error(f"Missing required fields: user_id={user_id}, file={'provided' if file else 'missing'}")
-            return jsonify({'error': 'File and user_id are required'}), 400
-        if not allowed_file(file.filename):
-            logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'File type not allowed. Use pdf, docx, txt'}), 400
-        logger.info(f"Generating flashcards from document for user_id: {user_id}, file: {file.filename}")
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        if filename.endswith('.pdf'):
-            document_text = process_pdf(file_path)
-        elif filename.endswith('.docx'):
-            document_text = process_docx(file_path)
-        elif filename.endswith('.txt'):
-            document_text = process_text_file(file_path)
-        else:
-            os.remove(file_path)
-            logger.error(f"Unsupported file type: {filename}")
-            return jsonify({'error': 'Unsupported file type'}), 400
-        os.remove(file_path)
-        if not document_text:
-            logger.error(f"Failed to process document: {filename}")
-            return jsonify({'error': 'Failed to process document'}), 500
-        flashcards = generate_flashcards_from_document(db, user_id, document_text, user_input, topic)
-        if not flashcards:
-            logger.warning(f"No flashcards generated from document for user_id: {user_id}")
-            return jsonify({'message': 'No flashcards generated from document.'}), 200
-        return jsonify({'flashcards': flashcards}), 200
-    except Exception as e:
-        logger.exception(f"Generate flashcards from document error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/generate_flashcards_from_input', methods=['POST'])
-def generate_flashcards_from_input_endpoint():
+@app.route('/start_exam', methods=['POST'])
+def start_exam_endpoint():
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in generate_flashcards_from_input request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
-        question = data.get('question')
-        answer = data.get('answer')
-        topic = data.get('topic', 'General')
-        if not user_id or not question or not answer:
-            logger.error(f"Missing required fields: user_id={user_id}, question={question}, answer={answer}")
-            return jsonify({'error': 'user_id, question, and answer are required'}), 400
-        logger.info(f"Generating flashcard from input for user_id: {user_id}, topic: {topic}")
-        flashcards = generate_flashcards_from_input(db, user_id, question, answer, topic)
-        return jsonify({'flashcards': flashcards}), 200
+        subject = data.get('subject')
+        num_questions = data.get('num_questions', 25)
+        age = data.get('age')
+        if not user_id or not subject:
+            logger.error("Missing required fields: user_id or subject")
+            return jsonify({"error": "Missing required fields"}), 400
+        exam_data = create_exam(user_id, subject, num_questions, age)
+        if "error" in exam_data:
+            logger.error(f"Exam start failed: {exam_data['error']}")
+            return jsonify(exam_data), 400
+        logger.info(f"Started exam for user_id: {user_id}, exam_id: {exam_data['exam_id']}")
+        return jsonify(exam_data), 200
     except Exception as e:
-        logger.exception(f"Generate flashcard from input error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in start_exam: {e}")
+        return jsonify({"error": "Server error"}), 500
 
-@app.route('/get_flashcards', methods=['POST'])
-def get_flashcards_endpoint():
+@app.route('/submit_exam', methods=['POST'])
+def submit_exam_endpoint():
     try:
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in get_flashcards request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
         user_id = data.get('user_id')
-        topic = data.get('topic')
-        status = data.get('status')
-        if not user_id:
-            logger.error("Missing user_id in get_flashcards request")
-            return jsonify({'error': 'user_id is required'}), 400
-        logger.info(f"Fetching flashcards for user_id: {user_id}, topic: {topic}, status: {status}")
-        flashcards = get_user_flashcards(db, user_id, topic, status)
-        return jsonify({'flashcards': flashcards}), 200
-    except Exception as e:
-        logger.exception(f"Get flashcards error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/update_flashcard_status', methods=['POST'])
-def update_flashcard_status_endpoint():
-    try:
-        data = request.get_json()
-        if not data:
-            logger.error("No JSON data provided in update_flashcard_status request")
-            return jsonify({'error': 'Invalid JSON payload'}), 400
-        user_id = data.get('user_id')
-        flashcard_id = data.get('flashcard_id')
-        status = data.get('status')
-        if not user_id or not flashcard_id or not status:
-            logger.error(f"Missing required fields: user_id={user_id}, flashcard_id={flashcard_id}, status={status}")
-            return jsonify({'error': 'user_id, flashcard_id, and status are required'}), 400
-        if status not in ['review', 'mastered']:
-            logger.error(f"Invalid status: {status}")
-            return jsonify({'error': 'Status must be "review" or "mastered"'}), 400
-        logger.info(f"Updating flashcard status for user_id: {user_id}, flashcard_id: {flashcard_id}")
-        result = update_flashcard_status(db, user_id, flashcard_id, status)
-        if 'error' in result:
-            logger.error(f"Update flashcard status error: {result['error']}")
-            return jsonify({'error': result['error']}), 500
+        exam_id = data.get('exam_id')
+        responses = data.get('responses')
+        if not user_id or not exam_id or not responses:
+            logger.error("Missing required fields: user_id, exam_id, or responses")
+            return jsonify({"error": "Missing required fields"}), 400
+        result = submit_exam(user_id, exam_id, responses)
+        if "error" in result:
+            logger.error(f"Exam submission failed: {result['error']}")
+            return jsonify(result), 400
+        logger.info(f"Exam submitted for user_id: {user_id}, exam_id: {exam_id}, score: {result['score']}")
         return jsonify(result), 200
     except Exception as e:
-        logger.exception(f"Update flashcard status error for user_id: {user_id}: {str(e)}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception(f"Error in submit_exam: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/clear_study_topic', methods=['POST'])
+def clear_study_topic_endpoint():
+    """Clear user's study topic."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        if not user_id:
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+
+        user_ref = db.collection('users').document(user_id)
+        user_ref.update({"study_goal": ""})
+        logger.info(f"Cleared study topic for user_id: {user_id}")
+        return jsonify({"message": "Study topic cleared"}), 200
+    except Exception as e:
+        logger.exception(f"Error in clear_study_topic: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        user_input = data.get('user_input')
+        conversation_history = data.get('conversation_history', [])
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not user_id or not user_input:
+            logger.error("Missing required fields: user_id or user_input")
+            return jsonify({"error": "Missing user_id or user_input"}), 400
+        
+        user_data = get_user_data(user_id)
+        if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({"error": "User not found"}), 404
+            
+        # Use conversation history from user_data if none provided
+        if not conversation_history and 'ai_conversation_history' in user_data:
+            conversation_history = user_data.get('ai_conversation_history', [])
+            
+        # Update user data based on input
+        user_data = process_user_input(user_id, user_input, user_data)
+
+        # Generate MAX's response
+        response, action = generate_gemini_response(
+            user_data, user_input, conversation_history, user_id, 
+            latitude=latitude, longitude=longitude
+        )
+        
+        # Check for image generation tag
+        image_data = None
+        if "[GENERATE_IMAGE:" in response:
+            match = re.search(r"\[GENERATE_IMAGE:\s*(.*?)\]", response)
+            if match:
+                image_prompt = match.group(1).strip()
+                try:
+                    generated_image = generate_image(image_prompt)
+                    if generated_image == "QUOTA_EXCEEDED":
+                        response = "I apologize, but I've hit my image generation limit for now. Please try again later! 🎨"
+                    elif generated_image == "SERVICE_UNAVAILABLE":
+                        response = "I'm sorry, but I can't generate images right now. The image generation service is temporarily unavailable. Please try again later or let me assist you with something else! 🎨"
+                    elif generated_image:
+                        image_data = generated_image
+                        response = "Here's your image! 🖼️"
+                    else:
+                        response = "I tried to generate the image but wasn't able to. The image service might be having issues. Let me know if you'd like to try something else! 🎨"
+                except Exception as e:
+                    logger.error(f"Error generating image: {e}")
+                    response = "I tried to generate an image but something went wrong. The image generation service might be having issues right now. 😕"
+        
+        # Save conversation history
+        try:
+            history_entry = {
+                "user": user_input,
+                "max": response,
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "type": "chat"
+            }
+            new_history = conversation_history + [history_entry]
+            save_conversation_history(user_id, new_history)
+        except Exception as e:
+            logger.error(f"Error saving conversation history: {e}")
+
+        return jsonify({
+            "response": response,
+            "action": action,
+            "timestamp": datetime.now().isoformat(),
+            "image_base64": image_data
+        }), 200
+
+    except Exception as e:
+        logger.exception(f"Error in max_chat: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/process_image', methods=['POST'])
+def process_image():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        user_input = data.get('user_input', '')  # Make user_input optional with default empty string
+        # Check both image_base64 and image_data for compatibility
+        image_data = data.get('image_base64') or data.get('image_data')
+        conversation_history = data.get('conversation_history', [])
+        mime_type = data.get('mime_type', 'image/png')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not user_id or not image_data:
+            missing = []
+            if not user_id: missing.append('user_id')
+            if not image_data: missing.append('image_base64')
+            logger.error(f"Missing required fields for image processing: {', '.join(missing)}")
+            return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+        user_data = get_user_data(user_id)
+        if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({"error": "User not found"}), 404
+
+        user_memories = user_data.get('memories', [])
+        
+        # Try to decode base64 image
+        try:
+            decoded_image = base64.b64decode(image_data)
+        except Exception as e:
+            logger.error(f"Error decoding base64 image data: {e}")
+            return jsonify({"error": "Invalid base64 image data format"}), 400
+
+        # Verify it's a valid image
+        try:
+            Image.open(BytesIO(decoded_image))
+        except Exception as e:
+            logger.error(f"Invalid image format: {e}")
+            return jsonify({"error": "Invalid image format. Please provide a valid image."}), 400
+
+        # Update user data based on input
+        user_data = process_user_input(user_id, user_input, user_data)
+        
+        # Process image with Gemini
+        response, action = process_image_with_gemini(
+            user_id, user_input, decoded_image, conversation_history, 
+            user_memories, mime_type, latitude, longitude
+        )
+        try:
+            history_entry = {
+                "user": user_input,
+                "max": response,
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "type": "image",
+                "image_base64": image_data
+            }
+            new_history = conversation_history + [history_entry]
+            save_conversation_history(user_id, new_history)
+        except Exception as e:
+            logger.error(f"Error saving conversation history: {e}")
+
+        return jsonify({
+            "response": response,
+            "action": action,
+            "timestamp": datetime.now().isoformat()
+        }, 200)
+
+    except Exception as e:
+        logger.exception(f"Error in max_image: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/process_document', methods=['POST'])
+def process_document():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        user_id = request.form.get('user_id')
+        user_input = request.form.get('user_input', '')
+        conversation_history = request.form.get('conversation_history', '[]')
+        if isinstance(conversation_history, str):
+            import json
+            conversation_history = json.loads(conversation_history)
+        latitude = request.form.get('latitude')
+        longitude = request.form.get('longitude')
+        
+        if not file or not user_id or file.filename == '':
+            logger.error("Missing required fields: file and user_id")
+            return jsonify({"error": "File and user_id are required"}), 400
+
+        if not allowed_file(file.filename):
+            logger.error("File type not allowed")
+            return jsonify({"error": "File type not allowed. Use pdf, docx, or txt"}), 400
+
+        user_data = get_user_data(user_id)
+        if not user_data:
+            logger.warning(f"User not found: {user_id}")
+            return jsonify({"error": "User not found"}), 404
+
+        user_memories = user_data.get('memories', [])
+        
+        # Update user data based on input
+        user_data = process_user_input(user_id, user_input, user_data)
+        
+        # Save and process the file
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+
+        try:
+            if filename.endswith('.pdf'):
+                processed_text = process_pdf(file_path)
+            elif filename.endswith('.docx'):
+                processed_text = process_docx(file_path)
+            elif filename.endswith('.txt'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    processed_text = f.read()
+            else:
+                os.remove(file_path)
+                return jsonify({"error": "Unsupported file type"}), 400
+
+            os.remove(file_path)  # Clean up after processing
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            logger.error(f"Error processing document: {e}")
+            return jsonify({"error": "Failed to process document"}), 500
+        
+        response, action = process_document_with_gemini(
+            user_id, processed_text, user_input, conversation_history, 
+            user_memories, latitude, longitude
+        )
+
+        # Save conversation history
+        try:
+            history_entry = {
+                "user": user_input,
+                "max": response,
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "type": "document",
+                "document_summary": processed_text[:200] + "..." if len(processed_text) > 200 else processed_text
+            }
+            new_history = conversation_history + [history_entry]
+            save_conversation_history(user_id, new_history)
+        except Exception as e:
+            logger.error(f"Error saving conversation history: {e}")
+
+        return jsonify({
+            "response": response,
+            "action": action,
+            "timestamp": datetime.now().isoformat()
+        }), 200
+
+    except Exception as e:
+        logger.exception(f"Error in max_document: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/study_plan/init', methods=['POST'])
+def study_plan_init_endpoint():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        goal = data.get('goal')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        days_per_week = data.get('days_per_week')
+        daily_duration_minutes = data.get('daily_duration_minutes')
+        if not all([user_id, goal, start_date, end_date, days_per_week, daily_duration_minutes]):
+            return jsonify({"error": "Missing required fields"}), 400
+        plan = initialize_study_plan(user_id, goal, start_date, end_date, days_per_week, daily_duration_minutes)
+        return jsonify(plan), 200
+    except Exception as e:
+        logger.exception(f"Error in study_plan_init: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/study_plan/log_daily', methods=['POST'])
+def study_plan_log_daily_endpoint():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        date = data.get('date')
+        completed_topics = data.get('completed_topics', [])
+        time_spent = data.get('time_spent')
+        notes = data.get('notes')
+        if not all([user_id, date, time_spent]):
+            return jsonify({"error": "Missing required fields"}), 400
+        log_entry = log_daily_study(user_id, date, completed_topics, time_spent, notes)
+        return jsonify(log_entry), 200
+    except Exception as e:
+        logger.exception(f"Error in study_plan_log_daily: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+# To be implemented when AI feedback loop is ready
+# @app.route('/study_plan/feedback', methods=['POST'])
+# def study_plan_feedback_endpoint():
+#     pass
+
+# To be implemented when goal completion checking is ready
+# @app.route('/study_plan/check_goal', methods=['POST'])
+# def study_plan_check_goal_endpoint():
+#     pass
+
+@app.route('/generate_flashcards/topic', methods=['POST'])
+def generate_flashcards_for_topic_endpoint():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        subject = data.get('subject')
+        topic = data.get('topic')
+        num_cards = int(data.get('num_cards', 3))
+        age = data.get('age')
+        year_group = data.get('year_group')
+        if not user_id or not subject or not topic:
+            return jsonify({"error": "Missing required fields"}), 400
+        cards = generate_flashcards_for_topic(user_id, subject, topic, num_cards, age, year_group)
+        return jsonify({"flashcards": cards}), 200
+    except Exception as e:
+        logger.exception(f"Error in generate_flashcards_for_topic: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/clear_chat', methods=['POST'])
+def clear_chat():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+
+        # Clear conversation history in Firestore
+        try:
+            db.collection('users').document(user_id).update({
+                "ai_conversation_history": []
+            })
+            logger.info(f"Cleared chat history for user_id: {user_id}")
+            return jsonify({
+                "message": "Chat history cleared successfully",
+                "timestamp": datetime.now().isoformat()
+            }), 200
+        except Exception as e:
+            logger.error(f"Error clearing chat history: {e}")
+            return jsonify({"error": "Failed to clear chat history"}), 500
+
+    except Exception as e:
+        logger.exception(f"Error in clear_chat: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/update_user_profile', methods=['POST'])
+def update_user_profile():
+    """Update user's basic profile information."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        updates = data.get('updates', {})
+        
+        if not user_id:
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+            
+        # Validate the updates
+        allowed_fields = {'name', 'age', 'year_group', 'study_goal'}
+        invalid_fields = set(updates.keys()) - allowed_fields
+        if invalid_fields:
+            return jsonify({"error": f"Invalid fields: {invalid_fields}"}), 400
+            
+        # Update the user document
+        user_ref = db.collection('users').document(user_id)
+        user_ref.update(updates)
+        
+        logger.info(f"Updated profile for user_id: {user_id}, fields: {list(updates.keys())}")
+        return jsonify({"message": "Profile updated successfully"}), 200
+        
+    except Exception as e:
+        logger.exception(f"Error in update_user_profile: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/update_study_topics', methods=['POST'])
+def update_study_topics():
+    """Update user's study topics."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        action = data.get('action')  # 'add' or 'remove'
+        topics = data.get('topics', [])  # list of {subject: string, topic: string}
+        
+        if not user_id or not action or not topics:
+            logger.error("Missing required fields: user_id, action, or topics")
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        if action not in ['add', 'remove']:
+            return jsonify({"error": "Invalid action. Use 'add' or 'remove'"}), 400
+            
+        user_ref = db.collection('users').document(user_id)
+        user_data = user_ref.get().to_dict()
+        
+        if not user_data:
+            return jsonify({"error": "User not found"}), 404
+            
+        current_topics = user_data.get('study_topics', [])
+        
+        if action == 'add':
+            # Add new topics, avoiding duplicates
+            for topic in topics:
+                if topic not in current_topics:
+                    user_ref.update({
+                        'study_topics': firestore.ArrayUnion([topic])
+                    })
+        else:  # action == 'remove'
+            # Remove topics
+            for topic in topics:
+                if topic in current_topics:
+                    user_ref.update({
+                        'study_topics': firestore.ArrayRemove([topic])
+                    })
+                    
+        logger.info(f"{action.capitalize()}ed study topics for user_id: {user_id}, topics: {topics}")
+        return jsonify({"message": f"Study topics {action}ed successfully"}), 200
+        
+    except Exception as e:
+        logger.exception(f"Error in update_study_topics: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/get_study_progress', methods=['POST'])
+def get_study_progress():
+    """Get user's study progress across all topics."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+            
+        user_data = get_user_data(user_id)
+        if not user_data:
+            return jsonify({"error": "User not found"}), 404
+            
+        # Get relevant data
+        study_topics = user_data.get('study_topics', [])
+        subjects_mastery = user_data.get('subjects_mastery', {})
+        learning_history = user_data.get('learning_history', [])
+        
+        # Calculate progress for each topic
+        topics_progress = []
+        for topic_info in study_topics:
+            subject = topic_info.get('subject')
+            topic = topic_info.get('topic')
+            
+            # Get mastery level
+            mastery = subjects_mastery.get(subject, {}).get(topic, 0.0)
+            
+            # Get recent activities
+            recent_activities = [
+                activity for activity in learning_history
+                if activity.get('subject') == subject and activity.get('topic') == topic
+            ][-5:]  # Last 5 activities
+            
+            topics_progress.append({
+                'subject': subject,
+                'topic': topic,
+                'mastery_level': mastery,
+                'recent_activities': recent_activities,
+                'needs_improvement': mastery < 0.7
+            })
+            
+        logger.info(f"Fetched study progress for user_id: {user_id}")
+        return jsonify({
+            'study_topics': study_topics,
+            'topics_progress': topics_progress
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Error in get_study_progress: {e}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route('/get_user_overview', methods=['POST'])
+def get_user_overview():
+    """Get comprehensive user overview including basic info and learning status."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            logger.error("Missing user_id in request")
+            return jsonify({"error": "Missing user_id"}), 400
+            
+        user_data = get_user_data(user_id)
+        if not user_data:
+            return jsonify({"error": "User not found"}), 404
+            
+        # Get basic user info
+        basic_info = {
+            "name": user_data.get('name', ''),
+            "age": user_data.get('age', 0),
+            "year_group": user_data.get('year_group') or map_age_to_year_group(user_data.get('age', 15)),
+            "created_at": user_data.get('created_at'),
+            "last_active": user_data.get('last_active'),
+            "subscription_status": user_data.get('subscription_status', 'free'),
+            "subscription_tier": user_data.get('subscription_tier', 'free')
+        }
+        
+        # Get study progress
+        study_topics = user_data.get('study_topics', [])
+        subjects_mastery = user_data.get('subjects_mastery', {})
+        
+        # Calculate overall progress
+        total_mastery = 0
+        topics_count = 0
+        subjects_progress = {}
+        
+        for subject, topics in subjects_mastery.items():
+            subject_total = 0
+            subject_count = 0
+            for topic, mastery in topics.items():
+                subject_total += mastery
+                subject_count += 1
+                total_mastery += mastery
+                topics_count += 1
+            
+            if subject_count > 0:
+                subjects_progress[subject] = {
+                    "average_mastery": subject_total / subject_count,
+                    "topics_count": subject_count
+                }
+        
+        overall_progress = {
+            "average_mastery": total_mastery / topics_count if topics_count > 0 else 0,
+            "total_topics": topics_count,
+            "subjects": subjects_progress
+        }
+        
+        # Get recent activity
+        recent_quizzes = []
+        quiz_history = user_data.get('quiz_history', [])
+        for quiz in sorted(quiz_history, key=lambda x: x.get('created_at', ''), reverse=True)[:5]:
+            recent_quizzes.append({
+                "quiz_id": quiz.get('quiz_id'),
+                "subject": quiz.get('subject'),
+                "topic": quiz.get('topic'),
+                "score": quiz.get('score', 0),
+                "status": quiz.get('status'),
+                "created_at": quiz.get('created_at')
+            })
+        
+        # Get achievements and stats
+        achievements = {
+            "total_quizzes": len(quiz_history),
+            "challenges_completed": user_data.get('challenges_completed', 0),
+            "xp": user_data.get('xp', 0),
+            "badges": user_data.get('badges', []),
+            "leaderboard_position": user_data.get('leaderboard_position', 0),
+            "leaderboard_rank": user_data.get('leaderboard_rank', '')
+        }
+        
+        # Get study preferences
+        preferences = {
+            "study_planner_enabled": user_data.get('study_planner_enabled', True),
+            "exam_mode_enabled": user_data.get('exam_mode_enabled', True),
+            "smart_flashcards_enabled": user_data.get('smart_flashcards_enabled', True),
+            "reminders_enabled": user_data.get('reminders_enabled', True),
+            "weekly_challenges_enabled": user_data.get('weekly_challenges_enabled', True)
+        }
+        
+        # Get recommended next steps
+        study_topics, _, learning_history = get_user_study_topics(user_id)
+        topics_to_improve = get_recommended_topics(user_id)
+        
+        next_steps = {
+            "topics_to_review": [
+                {"subject": t['subject'], "topic": t['topic'], "mastery": t['mastery']}
+                for t in topics_to_improve[:3]  # Top 3 topics that need improvement
+            ],
+            "suggested_new_topics": get_topics_for_year_group(basic_info['year_group'])[:3]  # 3 new topics to try
+        }
+        
+        return jsonify({
+            "basic_info": basic_info,
+            "study_progress": overall_progress,
+            "recent_activity": {
+                "quizzes": recent_quizzes,
+                "learning_history": learning_history[-5:] if learning_history else []  # Last 5 learning activities
+            },
+            "achievements": achievements,
+            "preferences": preferences,
+            "next_steps": next_steps,
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Error in get_user_overview: {e}")
+        return jsonify({"error": "Server error"}), 500
 
 if __name__ == '__main__':
-    logger.info("Starting Flask application")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
